@@ -26,7 +26,7 @@ def _get_token(cfg: dict) -> str:
 
 def _load_cfg(connector_id: int) -> dict:
     row = fetch_one("SELECT type, config_json FROM connectors WHERE id=%s", (connector_id,))
-    if not row or row["type"] not in ["azure", "azure_rg", "azure_adf"]:
+    if not row or row["type"] not in ["azure_adf"]:
         raise HTTPException(status_code=404, detail="Azure connector not found")
     return decrypt_config(row["config_json"])
 

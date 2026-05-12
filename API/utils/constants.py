@@ -1,6 +1,8 @@
 """Application-wide constants."""
 
-CONNECTOR_TYPES = ["mysql", "mssql", "azure", "databricks", "github", "azure_rg", "azure_adf"]
+
+
+CONNECTOR_TYPES = ["mysql", "mssql", "databricks", "github", "azure_adf"]
 
 ALERT_SEVERITY = ["critical", "high", "medium", "low", "info"]
 

@@ -20,8 +20,6 @@ import Loader from '../../components/Loader';
 const CONNECTOR_TYPES = [
   { value: 'mysql', label: 'MySQL' },
   { value: 'mssql', label: 'MSSQL' },
-  { value: 'azure', label: 'Azure' },
-  { value: 'azure_rg', label: 'Azure Resource Group' },
   { value: 'azure_adf', label: 'Azure Data Factory' },
   { value: 'databricks', label: 'Databricks' },
   { value: 'github', label: 'GitHub' },
@@ -41,19 +39,6 @@ const TYPE_FIELDS = {
     { key: 'username', label: 'Username', required: true },
     { key: 'password', label: 'Password', required: true, secret: true },
     { key: 'database', label: 'Database', required: true },
-  ],
-  azure: [
-    { key: 'subscription_id', label: 'Subscription ID', required: true },
-    { key: 'tenant_id', label: 'Tenant ID', required: true },
-    { key: 'client_id', label: 'Client ID', required: true },
-    { key: 'client_secret', label: 'Client Secret', required: true, secret: true },
-  ],
-  azure_rg: [
-    { key: 'subscription_id', label: 'Subscription ID', required: true },
-    { key: 'tenant_id', label: 'Tenant ID', required: true },
-    { key: 'client_id', label: 'Client ID', required: true },
-    { key: 'client_secret', label: 'Client Secret', required: true, secret: true },
-    { key: 'resource_group', label: 'Resource Group Name', required: true },
   ],
   azure_adf: [
     { key: 'subscription_id', label: 'Subscription ID', required: true },

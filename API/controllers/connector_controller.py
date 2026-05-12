@@ -103,21 +103,6 @@ def _test_azure(c: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "token": r.json().get("access_token"), "version": "Azure token acquired"}
 
 
-def _test_azure_rg(c: Dict[str, Any]) -> Dict[str, Any]:
-    auth = _test_azure(c)
-    sub = c.get("subscription_id")
-    rg = c.get("resource_group")
-    url = f"https://management.azure.com/subscriptions/{sub}/resourcegroups/{rg}?api-version=2021-04-01"
-    r = requests.get(
-        url,
-        headers={"Authorization": f"Bearer {auth['token']}"},
-        timeout=10,
-    )
-    if r.status_code != 200:
-        raise RuntimeError(f"Resource Group not found: {r.status_code} {r.text[:200]}")
-    return {"ok": True, "version": f"Resource Group {rg} reachable"}
-
-
 def _test_azure_adf(c: Dict[str, Any]) -> Dict[str, Any]:
     auth = _test_azure(c)
     sub = c.get("subscription_id")
@@ -169,10 +154,6 @@ def test_connection(conn_type: str, config: Dict[str, Any]) -> Dict[str, Any]:
         return _test_mysql(config)
     if conn_type == "mssql":
         return _test_mssql(config)
-    if conn_type == "azure":
-        return _test_azure(config)
-    if conn_type == "azure_rg":
-        return _test_azure_rg(config)
     if conn_type == "azure_adf":
         return _test_azure_adf(config)
     if conn_type == "databricks":
