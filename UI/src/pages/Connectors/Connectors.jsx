@@ -10,10 +10,11 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  fetchConnectors, createConnector, testConnection, scanConnector,
-  deleteConnector, clearTestResult, clearScanResult, testExistingConnector,
+  fetchConnectors, createConnector, testConnection, scanConnector, qualityCheckAllDatasets,
+  deleteConnector, clearTestResult, clearScanResult, clearQualityCheckAllResult, testExistingConnector,
 } from '../../redux/slices/connectorSlice';
 import Loader from '../../components/Loader';
 
@@ -61,7 +62,7 @@ const TYPE_FIELDS = {
 
 const Connectors = () => {
   const dispatch = useDispatch();
-  const { list, loading, error, testResult, scanResult, testLoading } =
+  const { list, loading, error, testResult, scanResult, qualityCheckAllResult, testLoading } =
     useSelector((s) => s.connectors);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -71,6 +72,7 @@ const Connectors = () => {
   const [savingError, setSavingError] = useState(null);
   const [runningTest, setRunningTest] = useState({});
   const [runningScan, setRunningScan] = useState({});
+  const [runningQualityCheckAll, setRunningQualityCheckAll] = useState({});
 
   useEffect(() => {
     dispatch(fetchConnectors());
@@ -142,6 +144,13 @@ const Connectors = () => {
     dispatch(fetchConnectors());
   };
 
+  const handleQualityCheckAll = async (id) => {
+    setRunningQualityCheckAll((s) => ({ ...s, [id]: true }));
+    await dispatch(qualityCheckAllDatasets(id));
+    setRunningQualityCheckAll((s) => ({ ...s, [id]: false }));
+    dispatch(fetchConnectors());
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this connector and all related datasets/alerts?')) return;
     await dispatch(deleteConnector(id));
@@ -174,6 +183,17 @@ const Connectors = () => {
           {scanResult.status === 'failed'
             ? `Scan failed: ${scanResult.error || 'unknown error'}`
             : `Scan complete. Datasets: ${scanResult.result?.datasets ?? 0}, schema drifts: ${scanResult.result?.drifts ?? 0}, PII datasets: ${scanResult.result?.pii_datasets ?? 0}.`}
+        </Alert>
+      )}
+      {qualityCheckAllResult && (
+        <Alert
+          severity={qualityCheckAllResult.status === 'failed' ? 'error' : 'success'}
+          sx={{ mb: 2 }}
+          onClose={() => dispatch(clearQualityCheckAllResult())}
+        >
+          {qualityCheckAllResult.status === 'failed'
+            ? `Quality check failed: ${qualityCheckAllResult.error || 'unknown error'}`
+            : qualityCheckAllResult.message || 'Quality checks started!'}
         </Alert>
       )}
 
@@ -234,6 +254,13 @@ const Connectors = () => {
                           <span>
                             <IconButton size="small" color="primary" onClick={() => handleScan(c.id)} disabled={runningScan[c.id]}>
                               {runningScan[c.id] ? <CircularProgress size={16} /> : <PlayCircleIcon fontSize="small" />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Run Quality Check on All Datasets">
+                          <span>
+                            <IconButton size="small" color="success" onClick={() => handleQualityCheckAll(c.id)} disabled={runningQualityCheckAll[c.id]}>
+                              {runningQualityCheckAll[c.id] ? <CircularProgress size={16} /> : <CheckCircleIcon fontSize="small" />}
                             </IconButton>
                           </span>
                         </Tooltip>

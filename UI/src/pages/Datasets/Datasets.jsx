@@ -3,7 +3,7 @@ import {
   Box, Typography, Card, CardContent, Stack, TextField, MenuItem, Button,
   Drawer, IconButton, Divider, Chip, Table, TableHead, TableRow, TableCell,
   TableBody, Paper, Alert, CircularProgress, Switch, FormControlLabel,
-  Accordion, AccordionSummary, AccordionDetails,
+  Accordion, AccordionSummary, AccordionDetails, Pagination,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CloseIcon from '@mui/icons-material/Close';
@@ -18,14 +18,17 @@ import { fetchConnectors } from '../../redux/slices/connectorSlice';
 import DatasetTable from '../../components/DatasetTable';
 import Loader from '../../components/Loader';
 
+const ITEMS_PER_PAGE = 10;
+
 const Datasets = () => {
   const dispatch = useDispatch();
-  const { list, loading, profile, lastAction } = useSelector((s) => s.datasets);
+  const { list: allDatasets, loading, profile, lastAction } = useSelector((s) => s.datasets);
   const connectors = useSelector((s) => s.connectors.list);
   const [filters, setFilters] = useState({ connector_id: '', contains_pii: 'all', q: '' });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [runningQuality, setRunningQuality] = useState(false);
   const [runningPii, setRunningPii] = useState(false);
+  const [page, setPage] = useState(1);
 
   const applyFilters = () => {
     const params = {};
@@ -34,12 +37,17 @@ const Datasets = () => {
     if (filters.contains_pii === 'none') params.contains_pii = false;
     if (filters.q) params.q = filters.q;
     dispatch(fetchDatasets(params));
+    setPage(1);
   };
 
   useEffect(() => {
     dispatch(fetchConnectors());
     dispatch(fetchDatasets());
   }, [dispatch]);
+
+  const handlePageChange = (event, value) => {
+    setPage(value);
+  };
 
   const openProfile = (d) => {
     dispatch(fetchDatasetProfile(d.id));
@@ -69,6 +77,9 @@ const Datasets = () => {
     dispatch(fetchDatasetProfile(profile.dataset.id));
     dispatch(fetchDatasets());
   };
+
+  const startIndex = (page - 1) * ITEMS_PER_PAGE;
+  const paginatedDatasets = allDatasets.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <Box>
@@ -122,10 +133,22 @@ const Datasets = () => {
 
       <Card>
         <CardContent>
-          {loading && (!list || list.length === 0) ? (
+          {loading && (!allDatasets || allDatasets.length === 0) ? (
             <Loader label="Loading datasets..." />
           ) : (
-            <DatasetTable datasets={list} onRowClick={openProfile} />
+            <>
+              <DatasetTable datasets={paginatedDatasets} onRowClick={openProfile} />
+              {allDatasets.length > ITEMS_PER_PAGE && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                  <Pagination
+                    count={Math.ceil(allDatasets.length / ITEMS_PER_PAGE)}
+                    page={page}
+                    onChange={handlePageChange}
+                    color="primary"
+                  />
+                </Box>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

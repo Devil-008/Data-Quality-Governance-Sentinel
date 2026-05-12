@@ -1,14 +1,21 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import api from '../../api/axios'
 
-export const fetchDashboard = createAsyncThunk('dashboard/fetch', async (_, { rejectWithValue }) => {
-  try {
-    const res = await api.get('/api/dashboard/overview')
-    return res.data
-  } catch (e) {
-    return rejectWithValue(e.response?.data?.detail || 'Failed to load dashboard')
-  }
-})
+export const fetchDashboard = createAsyncThunk(
+  'dashboard/fetch',
+  async (_, { rejectWithValue, getState }) => {
+    const { dashboard } = getState()
+    if (dashboard.data && !dashboard.loading) {
+      return dashboard.data
+    }
+    try {
+      const res = await api.get('/api/dashboard/overview')
+      return res.data
+    } catch (e) {
+      return rejectWithValue(e.response?.data?.detail || 'Failed to load dashboard')
+    }
+  },
+)
 
 const slice = createSlice({
   name: 'dashboard',

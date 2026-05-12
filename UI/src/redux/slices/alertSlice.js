@@ -1,10 +1,21 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../api/axios';
 
-export const fetchAlerts = createAsyncThunk('alerts/list', async (params = {}) => {
-  const res = await api.get('/api/alerts/list', { params });
-  return res.data;
-});
+export const fetchAlerts = createAsyncThunk(
+  'alerts/list',
+  async (params = {}, { rejectWithValue, getState }) => {
+    const { alerts } = getState()
+    if (alerts.list.length > 0 && !alerts.loading && Object.keys(params).length === 0) {
+      return alerts.list
+    }
+    try {
+      const res = await api.get('/api/alerts/list', { params })
+      return res.data
+    } catch (e) {
+      return rejectWithValue(e.response?.data?.detail || 'Failed to load alerts')
+    }
+  },
+)
 
 export const fetchAlertDetail = createAsyncThunk('alerts/detail', async (id) => {
   const res = await api.get(`/api/alerts/${id}`);

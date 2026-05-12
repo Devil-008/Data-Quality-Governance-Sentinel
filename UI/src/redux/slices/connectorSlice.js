@@ -1,10 +1,21 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../api/axios';
 
-export const fetchConnectors = createAsyncThunk('connectors/list', async () => {
-  const res = await api.get('/api/connectors/list');
-  return res.data;
-});
+export const fetchConnectors = createAsyncThunk(
+  'connectors/list',
+  async (_, { rejectWithValue, getState }) => {
+    const { connectors } = getState()
+    if (connectors.list.length > 0 && !connectors.loading) {
+      return connectors.list
+    }
+    try {
+      const res = await api.get('/api/connectors/list')
+      return res.data
+    } catch (e) {
+      return rejectWithValue(e.response?.data?.detail || 'Failed to load connectors')
+    }
+  },
+)
 
 export const createConnector = createAsyncThunk(
   'connectors/create',
@@ -58,6 +69,18 @@ export const scanConnector = createAsyncThunk(
   },
 );
 
+export const qualityCheckAllDatasets = createAsyncThunk(
+  'connectors/qualityCheckAll',
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await api.post(`/api/monitoring/quality-check-all/${id}`);
+      return res.data;
+    } catch (e) {
+      return rejectWithValue(e.response?.data?.detail || 'Quality check failed');
+    }
+  },
+);
+
 export const deleteConnector = createAsyncThunk(
   'connectors/delete',
   async (id, { rejectWithValue }) => {
@@ -78,12 +101,15 @@ const slice = createSlice({
     error: null,
     testResult: null,
     scanResult: null,
+    qualityCheckAllResult: null,
     testLoading: false,
     scanLoading: false,
+    qualityCheckAllLoading: false,
   },
   reducers: {
     clearTestResult(state) { state.testResult = null; },
     clearScanResult(state) { state.scanResult = null; },
+    clearQualityCheckAllResult(state) { state.qualityCheckAllResult = null; },
     clearError(state) { state.error = null; },
   },
   extraReducers: (b) => {
@@ -102,9 +128,12 @@ const slice = createSlice({
      .addCase(testExistingConnector.rejected, (s, a) => { s.testLoading = false; s.testResult = { success: false, message: a.payload }; })
      .addCase(scanConnector.pending, (s) => { s.scanLoading = true; s.scanResult = null; })
      .addCase(scanConnector.fulfilled, (s, a) => { s.scanLoading = false; s.scanResult = a.payload; })
-     .addCase(scanConnector.rejected, (s, a) => { s.scanLoading = false; s.scanResult = { status: 'failed', error: a.payload }; });
+     .addCase(scanConnector.rejected, (s, a) => { s.scanLoading = false; s.scanResult = { status: 'failed', error: a.payload }; })
+     .addCase(qualityCheckAllDatasets.pending, (s) => { s.qualityCheckAllLoading = true; s.qualityCheckAllResult = null; })
+     .addCase(qualityCheckAllDatasets.fulfilled, (s, a) => { s.qualityCheckAllLoading = false; s.qualityCheckAllResult = a.payload; })
+     .addCase(qualityCheckAllDatasets.rejected, (s, a) => { s.qualityCheckAllLoading = false; s.qualityCheckAllResult = { status: 'failed', error: a.payload }; });
   },
 });
 
-export const { clearTestResult, clearScanResult, clearError } = slice.actions;
+export const { clearTestResult, clearScanResult, clearQualityCheckAllResult, clearError } = slice.actions;
 export default slice.reducer;

@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS connectors (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(150) NOT NULL,
-  type ENUM('mysql','mssql','azure','databricks','github') NOT NULL,
+  type ENUM('mysql','mssql','azure','databricks','github','azure_adf') NOT NULL,
   config_json TEXT NOT NULL,
   status ENUM('healthy','unhealthy','unknown') NOT NULL DEFAULT 'unknown',
   last_tested_at DATETIME NULL,
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   connector_id INT NOT NULL,
   schema_name VARCHAR(150) NULL,
   dataset_name VARCHAR(200) NOT NULL,
-  dataset_type ENUM('table','view','file','job','workflow','blob','adf','cluster','notebook') NOT NULL DEFAULT 'table',
+  dataset_type ENUM('table','view','file','job','workflow','blob','adf','cluster','notebook','dataset','pipeline') NOT NULL DEFAULT 'table',
   row_count BIGINT NULL,
   column_count INT NULL,
   contains_pii TINYINT(1) NOT NULL DEFAULT 0,
@@ -170,6 +170,57 @@ VALUES (
   'admin'
 )
 ON DUPLICATE KEY UPDATE username = username;
+
+-- RULE BOOKS (for data quality checks)
+CREATE TABLE IF NOT EXISTS rule_books (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  description TEXT NULL,
+  rule_content TEXT NOT NULL,
+  vector_embedding TEXT NULL,
+  connector_type VARCHAR(100) NULL,
+  dataset_type VARCHAR(100) NULL,
+  created_by INT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_rule_book_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_rule_book_name (name),
+  INDEX idx_rule_book_connector_type (connector_type),
+  INDEX idx_rule_book_dataset_type (dataset_type)
+) ENGINE=InnoDB;
+
+-- DATASET VALIDATION RULES
+CREATE TABLE IF NOT EXISTS dataset_validation_rules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  dataset_id INT NULL,
+  rule_book_id INT NULL,
+  rule_name VARCHAR(200) NOT NULL,
+  rule_type ENUM('null_check','unique_check','range_check','regex_check','custom_sql','fk_check','datetime_check','row_count_check','schema_drift_check','pii_check','truncation_check','outlier_check','freshness_check') NOT NULL,
+  rule_config TEXT NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_dvr_dataset FOREIGN KEY (dataset_id) REFERENCES datasets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_dvr_rule_book FOREIGN KEY (rule_book_id) REFERENCES rule_books(id) ON DELETE SET NULL,
+  INDEX idx_dvr_dataset (dataset_id),
+  INDEX idx_dvr_rule_book (rule_book_id),
+  INDEX idx_dvr_active (is_active)
+) ENGINE=InnoDB;
+
+-- MONITORING LOGS (for AI analysis)
+CREATE TABLE IF NOT EXISTS monitoring_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  dataset_id INT NULL,
+  connector_id INT NULL,
+  log_type ENUM('quality_check','rule_execution','data_mark','ai_analysis') NOT NULL,
+  log_content TEXT NOT NULL,
+  vector_embedding TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_mlog_dataset FOREIGN KEY (dataset_id) REFERENCES datasets(id) ON DELETE SET NULL,
+  CONSTRAINT fk_mlog_connector FOREIGN KEY (connector_id) REFERENCES connectors(id) ON DELETE SET NULL,
+  INDEX idx_mlog_dataset (dataset_id),
+  INDEX idx_mlog_created (created_at)
+) ENGINE=InnoDB;
 
 INSERT INTO app_settings (setting_key, setting_value)
 VALUES

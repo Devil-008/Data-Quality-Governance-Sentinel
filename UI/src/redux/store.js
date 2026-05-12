@@ -8,9 +8,10 @@ import alerts from './slices/alertSlice';
 import notifications from './slices/notificationSlice';
 import monitoring from './slices/monitoringSlice';
 import settings from './slices/settingsSlice';
+import ruleBooks from './slices/ruleBookSlice';
 
 export const store = configureStore({
-  reducer: { auth, theme, dashboard, connectors, datasets, alerts, notifications, monitoring, settings },
+  reducer: { auth, theme, dashboard, connectors, datasets, alerts, notifications, monitoring, settings, ruleBooks },
   middleware: (gDM) => gDM({ serializableCheck: false }),
 });
 
