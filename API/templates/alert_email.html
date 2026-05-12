@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>DQ Sentinel Alert</title></head>
+<body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f4f6f9;margin:0;padding:24px;color:#1a2027;">
+  <table cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;">
+    <tr>
+      <td style="background:#0f172a;color:#fff;padding:18px 24px;">
+        <div style="font-size:13px;letter-spacing:1px;opacity:.75;">DQ SENTINEL</div>
+        <div style="font-size:20px;font-weight:600;margin-top:4px;">{{ alert.severity | upper }} ALERT</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px;">
+        <h2 style="margin:0 0 6px;font-size:18px;">{{ alert.title }}</h2>
+        <div style="font-size:12px;color:#64748b;margin-bottom:14px;">
+          Category: <b>{{ alert.category }}</b> · Created: {{ alert.created_at }}
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;font-size:14px;line-height:1.5;">
+          {{ alert.message }}
+        </div>
+
+        {% if alert.ai_summary %}
+        <h3 style="margin:20px 0 6px;font-size:14px;color:#0f172a;">🤖 AI Summary</h3>
+        <div style="font-size:14px;line-height:1.5;color:#334155;">{{ alert.ai_summary }}</div>
+        {% endif %}
+
+        {% if alert.ai_root_cause %}
+        <h3 style="margin:18px 0 6px;font-size:14px;color:#0f172a;">Probable Root Cause</h3>
+        <div style="font-size:14px;line-height:1.5;color:#334155;">{{ alert.ai_root_cause }}</div>
+        {% endif %}
+
+        {% if alert.ai_impact %}
+        <h3 style="margin:18px 0 6px;font-size:14px;color:#0f172a;">Business Impact</h3>
+        <div style="font-size:14px;line-height:1.5;color:#334155;">{{ alert.ai_impact }}</div>
+        {% endif %}
+
+        {% if alert.ai_recommendation %}
+        <h3 style="margin:18px 0 6px;font-size:14px;color:#0f172a;">Recommended Actions</h3>
+        <div style="font-size:14px;line-height:1.5;color:#334155;">{{ alert.ai_recommendation }}</div>
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f8fafc;color:#64748b;font-size:11px;padding:14px 24px;text-align:center;border-top:1px solid #e2e8f0;">
+        Automated alert from DQ Sentinel. Reply directly to your data team for context.
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
