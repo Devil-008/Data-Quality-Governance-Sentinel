@@ -1,5 +1,7 @@
 """DQ Sentinel — FastAPI application entry point."""
+
 import os
+import time
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -19,6 +21,7 @@ from controllers.ai_controller import router as ai_router
 from controllers.settings_controller import router as settings_router
 from controllers.rule_book_controller import router as rule_book_router
 from scheduler.monitoring_scheduler import start_scheduler, shutdown_scheduler
+from utils.chroma_helper import init_chroma
 from utils.common import logger
 
 load_dotenv()
@@ -27,6 +30,16 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("DQ Sentinel starting up...")
+
+    # Initialize Chroma DB
+    try:
+        init_chroma()
+        logger.info("Chroma DB initialized")
+        # Give a small delay for model to finish downloading
+        time.sleep(1)
+    except Exception as e:
+        logger.warning("Chroma DB initialization failed (optional): %s", e)
+
     start_scheduler()
     yield
     shutdown_scheduler()
@@ -82,6 +95,7 @@ app.include_router(rule_book_router)
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "main:app",
         host=os.getenv("APP_HOST", "0.0.0.0"),

@@ -4,6 +4,7 @@ A single background scheduler polls `monitoring_jobs` every minute and triggers
 the appropriate scan/quality job when its `next_run_at` is due. This avoids
 running everything on every minute and stays scalable.
 """
+
 import datetime
 import threading
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -31,8 +32,12 @@ def _tick():
         return
     for job in due:
         try:
-            logger.info("Scheduler executing job id=%s type=%s connector=%s",
-                        job["id"], job["job_type"], job["connector_id"])
+            logger.info(
+                "Scheduler executing job id=%s type=%s connector=%s",
+                job["id"],
+                job["job_type"],
+                job["connector_id"],
+            )
             if job["job_type"] == "scan":
                 _run_scan(job["connector_id"])
             # Future types (quality/cloud/pii) currently piggyback on the scan,
@@ -57,18 +62,30 @@ def start_scheduler():
     with _lock:
         if _scheduler is not None:
             return _scheduler
-        sched = BackgroundScheduler(timezone="UTC", job_defaults={"coalesce": True, "max_instances": 1})
-        sched.add_job(_tick, "interval", minutes=1, id="dq_tick", replace_existing=True)
-        sched.start()
-        _scheduler = sched
-        logger.info("APScheduler started (1-minute tick).")
-        return sched
+        try:
+            sched = BackgroundScheduler(
+                timezone="UTC", job_defaults={"coalesce": True, "max_instances": 1}
+            )
+            sched.add_job(
+                _tick, "interval", minutes=1, id="dq_tick", replace_existing=True
+            )
+            sched.start()
+            _scheduler = sched
+            logger.info("APScheduler started (1-minute tick).")
+            return sched
+        except Exception as e:
+            logger.error("Failed to start scheduler: %s", e)
+            raise
 
 
 def shutdown_scheduler():
     global _scheduler
     with _lock:
         if _scheduler:
-            _scheduler.shutdown(wait=False)
-            _scheduler = None
-            logger.info("APScheduler stopped.")
+            try:
+                _scheduler.shutdown(wait=True)  # Changed from wait=False to wait=True
+            except Exception as e:
+                logger.warning("Scheduler shutdown error (non-critical): %s", e)
+            finally:
+                _scheduler = None
+                logger.info("APScheduler stopped.")

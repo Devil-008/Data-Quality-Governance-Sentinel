@@ -54,10 +54,8 @@ const RuleBooks = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [content, setContent] = useState('');
   const [file, setFile] = useState(null);
   const [connectorType, setConnectorType] = useState('');
-  const [datasetType, setDatasetType] = useState('');
   const [savingError, setSavingError] = useState(null);
   const [selectedRuleBook, setSelectedRuleBook] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -118,10 +116,8 @@ const RuleBooks = () => {
   const openDialog = () => {
     setName('');
     setDescription('');
-    setContent('');
     setFile(null);
     setConnectorType('');
-    setDatasetType('');
     setSavingError(null);
     setDialogOpen(true);
   };
@@ -136,17 +132,15 @@ const RuleBooks = () => {
       setSavingError('Rule book name is required');
       return;
     }
-    if (!content && !file) {
-      setSavingError('Either content or file is required');
+    if (!file) {
+      setSavingError('File upload is required');
       return;
     }
-    const res = await dispatch(createRuleBook({ 
-      name, 
-      description, 
-      content, 
+    const res = await dispatch(createRuleBook({
+      name,
+      description,
       file,
       connector_type: connectorType || null,
-      dataset_type: datasetType || null,
     }));
     if (createRuleBook.fulfilled.match(res)) {
       closeDialog();
@@ -254,16 +248,17 @@ const RuleBooks = () => {
       </Card>
 
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Add Rule Book</DialogTitle>
+        <DialogTitle>Upload Rule Book</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {savingError && <Alert severity="error">{savingError}</Alert>}
             <TextField
-              label="Name"
+              label="Rule Book Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               fullWidth
               required
+              placeholder="e.g., MySQL Data Quality Rule Book"
             />
             <TextField
               label="Description"
@@ -272,10 +267,11 @@ const RuleBooks = () => {
               fullWidth
               multiline
               rows={2}
+              placeholder="Describe the purpose and scope of this rulebook"
             />
             <TextField
               select
-              label="Connector Type"
+              label="Connector Type (Optional)"
               value={connectorType}
               onChange={(e) => setConnectorType(e.target.value)}
               fullWidth
@@ -284,40 +280,24 @@ const RuleBooks = () => {
                 <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
               ))}
             </TextField>
-            <TextField
-              select
-              label="Dataset Type"
-              value={datasetType}
-              onChange={(e) => setDatasetType(e.target.value)}
-              fullWidth
-            >
-              {DATASET_TYPES.map((t) => (
-                <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              label="Rule Content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              fullWidth
-              multiline
-              rows={8}
-            />
             <Box>
-              <Typography variant="subtitle2">Or upload a file:</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Upload TXT File *</Typography>
               <input
                 type="file"
-                accept=".txt,.md,.json,.yaml,.yml"
+                accept=".txt,.md"
                 onChange={(e) => setFile(e.target.files[0] || null)}
-                style={{ marginTop: 8 }}
+                required
               />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                Upload a TXT file containing your rulebook definition with rules, penalties, and quality score formula.
+              </Typography>
             </Box>
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDialog}>Cancel</Button>
           <Button onClick={handleSave} variant="contained" disabled={loading}>
-            Save
+            Upload Rule Book
           </Button>
         </DialogActions>
       </Dialog>
