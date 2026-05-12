@@ -1,0 +1,121 @@
+/* ---------------------------------------------------------------
+ * DataSentinel AI — Design Tokens
+ * Editorial / technical aesthetic. Dark-first, refined light variant.
+ * Accent: oxidized amber (#d97742) instead of generic SaaS blue/purple.
+ * --------------------------------------------------------------- */
+
+:root {
+  /* ---------- typography ---------- */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body:    'Manrope', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ---------- radii ---------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* ---------- shadows ---------- */
+  --shadow-sm:  0 1px 2px rgba(0,0,0,.08);
+  --shadow-md:  0 6px 24px -8px rgba(15, 14, 13, .25);
+  --shadow-lg:  0 30px 60px -20px rgba(8, 7, 6, .45);
+  --shadow-glow: 0 0 0 1px rgba(217,119,66,.35), 0 18px 48px -16px rgba(217,119,66,.45);
+
+  /* ---------- timing ---------- */
+  --ease-out: cubic-bezier(.16,1,.3,1);
+  --ease-in-out: cubic-bezier(.65,0,.35,1);
+
+  /* ---------- semantic colors filled per theme ---------- */
+}
+
+/* ============================================================
+   DARK theme (default brand)
+   ============================================================ */
+html.dark {
+  /* surfaces */
+  --bg:           #0a0a0c;
+  --bg-elev-1:    #111114;
+  --bg-elev-2:    #17181c;
+  --bg-elev-3:    #1d1f24;
+  --panel:        #121317;
+  --panel-soft:   #15171c;
+
+  /* lines */
+  --border:       #25272e;
+  --border-soft:  #1c1e24;
+  --border-strong:#33363f;
+
+  /* text */
+  --fg:           #f1ece4;          /* warm off-white */
+  --fg-muted:     #a6a39d;
+  --fg-subtle:    #6e6c67;
+  --fg-inverse:   #0a0a0c;
+
+  /* brand accent — oxidized amber */
+  --accent:       #d97742;
+  --accent-hover: #e0875a;
+  --accent-soft:  #2a1d14;
+  --accent-fg:    #0a0a0c;
+
+  /* secondary accent — pale moss for "healthy" signals */
+  --accent-2:     #93b8a4;
+
+  /* status */
+  --success:      #6dbf8b;
+  --warning:      #e8c46a;
+  --danger:       #e87063;
+  --info:         #7fb4d4;
+
+  /* chart palette */
+  --chart-1: #d97742;
+  --chart-2: #93b8a4;
+  --chart-3: #e8c46a;
+  --chart-4: #7fb4d4;
+  --chart-5: #c89dd0;
+
+  --grid:         rgba(255,255,255,.04);
+}
+
+/* ============================================================
+   LIGHT theme — paper + ink
+   ============================================================ */
+html.light {
+  --bg:           #f6f3ec;          /* warm paper */
+  --bg-elev-1:    #fbf8f1;
+  --bg-elev-2:    #ffffff;
+  --bg-elev-3:    #ffffff;
+  --panel:        #ffffff;
+  --panel-soft:   #faf7f0;
+
+  --border:       #e3ddd0;
+  --border-soft:  #ece6d7;
+  --border-strong:#cdc5b3;
+
+  --fg:           #1a1816;
+  --fg-muted:     #58544e;
+  --fg-subtle:    #8a857c;
+  --fg-inverse:   #ffffff;
+
+  --accent:       #b95c2a;
+  --accent-hover: #a44c1f;
+  --accent-soft:  #f3e4d6;
+  --accent-fg:    #ffffff;
+
+  --accent-2:     #4f7d68;
+
+  --success:      #347a52;
+  --warning:      #a87a17;
+  --danger:       #b94234;
+  --info:         #2f6f95;
+
+  --chart-1: #b95c2a;
+  --chart-2: #4f7d68;
+  --chart-3: #a87a17;
+  --chart-4: #2f6f95;
+  --chart-5: #8a4b78;
+
+  --grid:         rgba(0,0,0,.04);
+}

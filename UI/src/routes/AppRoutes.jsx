@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 
 import ProtectedRoute from '../components/ProtectedRoute';
 import Layout from '../components/Layout';
-
+import Landing from '../pages/Landing/Landing';
 import Login from '../pages/Login/Login';
 import Dashboard from '../pages/Dashboard/Dashboard';
 import Connectors from '../pages/Connectors/Connectors';
@@ -16,6 +16,7 @@ import Settings from '../pages/Settings/Settings';
 const AppRoutes = () => {
   return (
     <Routes>
+ <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route
         element={
