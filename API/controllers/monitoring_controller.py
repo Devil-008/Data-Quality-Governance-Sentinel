@@ -20,9 +20,9 @@ from utils.common import (
     detect_pii_in_samples, safe_json_dumps,
 )
 from utils.constants import QUALITY_CHECKS
-from utils.ai_helper import analyze_issue
+from utils.ai_helper import analyze_issue, validate_dataset_quality
 from utils.email_helper import send_alert_email
-from utils.vector_helper import add_monitoring_log_to_index
+from utils.vector_helper import add_monitoring_log_to_index, search_rule_books
 from controllers.connector_controller import test_connection
 
 router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
@@ -567,6 +567,64 @@ def _alert_recipients() -> List[str]:
     row = fetch_one("SELECT setting_value FROM app_settings WHERE setting_key='alert_email_recipients'")
     raw = (row or {}).get("setting_value", "") or ""
     return [x.strip() for x in raw.split(",") if x.strip()]
+
+
+# ---------- AI-driven quality checks -------------------------------------
+def _run_ai_quality_checks(
+    dataset_id: int,
+    ds_info: dict,
+    sample_rows: Optional[List[dict]] = None,
+) -> Tuple[List[str], float, dict, List[str], List[str]]:
+    """Run AI-driven quality checks using Rule Books from ChromaDB."""
+    try:
+        dataset_metadata = {
+            "id": ds_info["id"],
+            "name": ds_info["dataset_name"],
+            "schema": ds_info["schema_name"],
+            "type": ds_info["dataset_type"],
+            "row_count": ds_info["row_count"],
+            "column_count": ds_info["column_count"],
+            "connector_type": ds_info["connector_type"],
+        }
+        
+        columns = fetch_all("SELECT * FROM dataset_columns WHERE dataset_id=%s", (dataset_id,))
+        schema = [
+            {
+                "name": c["column_name"],
+                "type": c["data_type"],
+                "nullable": bool(c["is_nullable"]),
+                "is_pii": bool(c["is_pii"]),
+                "pii_category": c["pii_category"],
+            }
+            for c in columns
+        ]
+        
+        search_query = f"Data quality checks for {ds_info['connector_type']} {ds_info['dataset_type']} {ds_info['dataset_name']}"
+        rule_results = search_rule_books(
+            search_query,
+            top_k=10,
+            connector_type=ds_info["connector_type"]
+        )
+        
+        rule_chunks = [r["document"] for r in rule_results if r.get("document")]
+        
+        ai_result = validate_dataset_quality(
+            dataset_metadata=dataset_metadata,
+            schema=schema,
+            sample_rows=sample_rows,
+            rule_chunks=rule_chunks,
+        )
+        
+        return (
+            ai_result["issues"],
+            ai_result["quality_score"],
+            {},
+            ai_result["pii_columns"],
+            ai_result["pii_categories"],
+        )
+    except Exception as e:
+        logger.error("AI quality checks failed: %s", e)
+        return [f"AI check error: {str(e)}"], 80.0, {}, [], []
 
 
 # ---------- comprehensive quality checks ----------------------------------
@@ -1128,48 +1186,82 @@ def quality_check_all_datasets(
                         (dataset_id,),
                     )
                     if ds_info and ds_info["connector_type"] == "mysql":
+                        sample_rows = []
+                        try:
+                            cn = _mysql_conn(cfg)
+                            with cn.cursor() as cur:
+                                schema = ds_info["schema_name"] or cfg.get("database")
+                                name = ds_info["dataset_name"]
+                                try:
+                                    cur.execute(f"SELECT * FROM `{schema}`.`{name}` LIMIT 20")
+                                    sample_rows = cur.fetchall()
+                                except Exception:
+                                    pass
+                            cn.close()
+                        except Exception:
+                            pass
+                        
+                        ai_issues, ai_score, ai_metrics, pii_columns, pii_categories = _run_ai_quality_checks(
+                            dataset_id, ds_info, sample_rows
+                        )
+                        
                         issues, score, metrics = _run_mysql_quality_checks(dataset_id, cfg, ds_info)
+                        
+                        issues.extend(ai_issues)
+                        combined_score = (score + ai_score) / 2
                         
                         validation_results = _execute_validation_rules(dataset_id, ds_info["config_json"])
                         failed_rules = [r for r in validation_results if not r["passed"]]
                         for r in failed_rules:
                             issues.append(f"Rule '{r['rule_name']}' failed: {r['message']}")
-                            score -= 10
+                            combined_score -= 5
                         
-                        score = max(0.0, min(100.0, score))
+                        if pii_columns:
+                            pii_cat_str = ",".join(sorted(set(pii_categories)))
+                            execute(
+                                "UPDATE datasets SET contains_pii=1, pii_categories=%s WHERE id=%s",
+                                (pii_cat_str, dataset_id),
+                            )
+                            for col_name in pii_columns:
+                                execute(
+                                    "UPDATE dataset_columns SET is_pii=1 WHERE dataset_id=%s AND column_name=%s",
+                                    (dataset_id, col_name),
+                                )
+                        
+                        combined_score = max(0.0, min(100.0, combined_score))
                         execute(
                             "UPDATE datasets SET quality_score=%s, last_profiled_at=%s WHERE id=%s",
-                            (score, datetime.datetime.utcnow(), dataset_id),
+                            (combined_score, datetime.datetime.utcnow(), dataset_id),
                         )
                         execute(
                             "INSERT INTO monitoring_runs (connector_id, dataset_id, run_type, status, message, "
                             "metrics_json, finished_at) VALUES (%s, %s, 'quality', 'success', %s, %s, %s)",
-                            (ds_info["connector_id"], dataset_id, f"score={score}",
-                             safe_json_dumps(metrics), datetime.datetime.utcnow()),
+                            (ds_info["connector_id"], dataset_id, f"score={combined_score}",
+                             safe_json_dumps({**metrics, **ai_metrics}), datetime.datetime.utcnow()),
                         )
                         
                         _log_monitoring_event(
                             log_type="quality_check",
-                            log_content=f"Quality check on {ds_info['dataset_name']}: score {score:.1f}, issues {len(issues)}",
+                            log_content=f"Quality check on {ds_info['dataset_name']}: score {combined_score:.1f}, issues {len(issues)}",
                             dataset_id=dataset_id,
                             connector_id=ds_info["connector_id"],
                         )
                         
                         if issues:
-                            severity = "high" if score < 70 else ("medium" if score < 85 else "low")
+                            severity = "high" if combined_score < 70 else ("medium" if combined_score < 85 else "low")
                             _create_alert(
                                 "quality",
                                 severity,
-                                f"Quality issues on {ds_info['dataset_name']} (score {score:.1f})",
-                                f"Score: {score:.1f} - {'; '.join(issues[:10])}",
+                                f"Quality issues on {ds_info['dataset_name']} (score {combined_score:.1f})",
+                                f"Score: {combined_score:.1f} - {'; '.join(issues[:10])}",
                                 connector_id=ds_info["connector_id"],
                                 dataset_id=dataset_id,
-                                ai_payload={"score": score, "issues": issues, "metrics": metrics},
+                                ai_payload={"score": combined_score, "issues": issues, "metrics": {**metrics, **ai_metrics}},
                             )
                         
                         results.append({
                             "dataset_id": dataset_id,
-                            "score": score,
+                            "score": combined_score,
                             "issues": len(issues),
                         })
                 except Exception as e:

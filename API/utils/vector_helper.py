@@ -1,6 +1,7 @@
 """Vector DB helper using Chroma DB for rule books and monitoring logs."""
 import os
 import json
+import uuid
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 import chromadb
@@ -12,6 +13,8 @@ load_dotenv()
 
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./data/chroma")
 MODEL_NAME = os.getenv("VECTOR_MODEL", "all-MiniLM-L6-v2")
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 1000))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 200))
 
 _client: Optional[chromadb.Client] = None
 _rule_book_collection: Optional[chromadb.Collection] = None
@@ -57,16 +60,64 @@ def _get_monitoring_log_collection() -> chromadb.Collection:
     return _monitoring_log_collection
 
 
-def add_rule_book_to_index(text: str, rule_book_id: int, name: str) -> str:
+def _chunk_text(text: str, chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP) -> List[str]:
+    """Split text into overlapping chunks."""
+    chunks = []
+    start = 0
+    text_length = len(text)
+    
+    while start < text_length:
+        end = min(start + chunk_size, text_length)
+        
+        if end < text_length:
+            last_space = text.rfind(' ', start, end)
+            last_newline = text.rfind('\n', start, end)
+            if last_newline > start:
+                end = last_newline + 1
+            elif last_space > start:
+                end = last_space + 1
+        
+        chunks.append(text[start:end])
+        start = end - chunk_overlap
+        
+        if start < 0:
+            start = 0
+    
+    return chunks
+
+
+def add_rule_book_to_index(text: str, rule_book_id: int, name: str, metadata: Optional[Dict[str, Any]] = None) -> List[str]:
+    """Add rule book to Chroma DB with proper chunking and metadata."""
     collection = _get_rule_book_collection()
-    doc_id = f"rule_book_{rule_book_id}"
+    chunks = _chunk_text(text)
+    
+    doc_ids = []
+    documents = []
+    metadatas = []
+    
+    for i, chunk in enumerate(chunks):
+        doc_id = f"rule_book_{rule_book_id}_chunk_{i}_{uuid.uuid4().hex[:8]}"
+        chunk_metadata = {
+            "type": "rule_book",
+            "rulebook_id": rule_book_id,
+            "name": name,
+            "chunk_index": i,
+            "total_chunks": len(chunks),
+        }
+        if metadata:
+            chunk_metadata.update(metadata)
+        
+        doc_ids.append(doc_id)
+        documents.append(chunk)
+        metadatas.append(chunk_metadata)
+    
     collection.add(
-        documents=[text],
-        metadatas=[{"type": "rule_book", "id": rule_book_id, "name": name}],
-        ids=[doc_id],
+        documents=documents,
+        metadatas=metadatas,
+        ids=doc_ids,
     )
-    logger.info("Rule book added to Chroma DB: id=%s", rule_book_id)
-    return doc_id
+    logger.info("Rule book added to Chroma DB: id=%s, chunks=%d", rule_book_id, len(chunks))
+    return doc_ids
 
 
 def add_monitoring_log_to_index(text: str, log_id: int, log_type: str) -> str:
@@ -81,16 +132,26 @@ def add_monitoring_log_to_index(text: str, log_id: int, log_type: str) -> str:
     return doc_id
 
 
-def search_rule_books(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+def search_rule_books(query: str, top_k: int = 5, connector_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Search rule books with optional connector_type filter."""
     collection = _get_rule_book_collection()
+    
+    where = {}
+    if connector_type:
+        where["connector_type"] = connector_type
+    
     results = collection.query(
         query_texts=[query],
         n_results=top_k,
+        where=where if where else None,
     )
+    
     output = []
     for i in range(len(results["ids"][0])):
         output.append({
-            **(results["metadatas"][0][i] if results["metadatas"] else {}),
+            "id": results["ids"][0][i],
+            "document": results["documents"][0][i] if results["documents"] else None,
+            "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
             "distance": results["distances"][0][i] if results["distances"] else 0,
         })
     return output
@@ -109,6 +170,18 @@ def search_monitoring_logs(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
             "distance": results["distances"][0][i] if results["distances"] else 0,
         })
     return output
+
+
+def delete_rule_book_from_index(rule_book_id: int) -> None:
+    """Delete all chunks for a specific rule book."""
+    collection = _get_rule_book_collection()
+    try:
+        collection.delete(
+            where={"rulebook_id": rule_book_id}
+        )
+        logger.info("Rule book deleted from Chroma DB: id=%s", rule_book_id)
+    except Exception as e:
+        logger.warning("Failed to delete rule book from index: %s", e)
 
 
 def clear_index():

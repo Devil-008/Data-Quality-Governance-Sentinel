@@ -54,10 +54,8 @@ const RuleBooks = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [content, setContent] = useState('');
   const [file, setFile] = useState(null);
   const [connectorType, setConnectorType] = useState('');
-  const [datasetType, setDatasetType] = useState('');
   const [savingError, setSavingError] = useState(null);
   const [selectedRuleBook, setSelectedRuleBook] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -118,10 +116,8 @@ const RuleBooks = () => {
   const openDialog = () => {
     setName('');
     setDescription('');
-    setContent('');
     setFile(null);
     setConnectorType('');
-    setDatasetType('');
     setSavingError(null);
     setDialogOpen(true);
   };
@@ -136,17 +132,15 @@ const RuleBooks = () => {
       setSavingError('Rule book name is required');
       return;
     }
-    if (!content && !file) {
-      setSavingError('Either content or file is required');
+    if (!file) {
+      setSavingError('File is required');
       return;
     }
     const res = await dispatch(createRuleBook({ 
       name, 
       description, 
-      content, 
       file,
       connector_type: connectorType || null,
-      dataset_type: datasetType || null,
     }));
     if (createRuleBook.fulfilled.match(res)) {
       closeDialog();
@@ -199,7 +193,6 @@ const RuleBooks = () => {
                   <TableRow>
                     <TableCell><strong>Name</strong></TableCell>
                     <TableCell><strong>Connector Type</strong></TableCell>
-                    <TableCell><strong>Dataset Type</strong></TableCell>
                     <TableCell><strong>Created At</strong></TableCell>
                     <TableCell align="right"><strong>Actions</strong></TableCell>
                   </TableRow>
@@ -216,13 +209,6 @@ const RuleBooks = () => {
                       <TableCell>
                         {rb.connector_type ? (
                           <Chip label={rb.connector_type} size="small" variant="outlined" />
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">-</Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {rb.dataset_type ? (
-                          <Chip label={rb.dataset_type} size="small" variant="outlined" />
                         ) : (
                           <Typography variant="caption" color="text.secondary">-</Typography>
                         )}
@@ -284,30 +270,11 @@ const RuleBooks = () => {
                 <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
               ))}
             </TextField>
-            <TextField
-              select
-              label="Dataset Type"
-              value={datasetType}
-              onChange={(e) => setDatasetType(e.target.value)}
-              fullWidth
-            >
-              {DATASET_TYPES.map((t) => (
-                <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              label="Rule Content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              fullWidth
-              multiline
-              rows={8}
-            />
             <Box>
-              <Typography variant="subtitle2">Or upload a file:</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Upload Rule Book File (TXT only):</Typography>
               <input
                 type="file"
-                accept=".txt,.md,.json,.yaml,.yml"
+                accept=".txt"
                 onChange={(e) => setFile(e.target.files[0] || null)}
                 style={{ marginTop: 8 }}
               />
@@ -335,14 +302,18 @@ const RuleBooks = () => {
                   {selectedRuleBook.description}
                 </Typography>
               )}
-              <Card variant="outlined" sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Rule Content</Typography>
-                  <Paper variant="outlined" sx={{ p: 2, fontFamily: 'monospace', fontSize: 14, maxHeight: '40vh', overflow: 'auto' }}>
-                    <pre>{selectedRuleBook.rule_content}</pre>
-                  </Paper>
-                </CardContent>
-              </Card>
+              {selectedRuleBook.filename && (
+                <Card variant="outlined" sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                      File: {selectedRuleBook.filename}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                      Connector Type: {selectedRuleBook.connector_type || '-'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
 
               <Card variant="outlined" sx={{ mb: 2 }}>
                 <CardContent>

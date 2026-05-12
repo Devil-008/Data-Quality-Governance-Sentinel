@@ -176,17 +176,15 @@ CREATE TABLE IF NOT EXISTS rule_books (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
   description TEXT NULL,
-  rule_content TEXT NOT NULL,
-  vector_embedding TEXT NULL,
+  filename VARCHAR(255) NULL,
+  file_path TEXT NULL,
   connector_type VARCHAR(100) NULL,
-  dataset_type VARCHAR(100) NULL,
   created_by INT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_rule_book_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
   INDEX idx_rule_book_name (name),
-  INDEX idx_rule_book_connector_type (connector_type),
-  INDEX idx_rule_book_dataset_type (dataset_type)
+  INDEX idx_rule_book_connector_type (connector_type)
 ) ENGINE=InnoDB;
 
 -- DATASET VALIDATION RULES

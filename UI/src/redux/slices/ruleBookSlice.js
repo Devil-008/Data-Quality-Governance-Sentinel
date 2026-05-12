@@ -15,19 +15,15 @@ export const fetchRuleBooks = createAsyncThunk(
 
 export const createRuleBook = createAsyncThunk(
   'ruleBooks/create',
-  async ({ name, description, content, file, connector_type, dataset_type }, { rejectWithValue, dispatch }) => {
+  async ({ name, description, file, connector_type }, { rejectWithValue, dispatch }) => {
     try {
       const formData = new FormData()
       formData.append('name', name)
       if (description) formData.append('description', description)
-      if (content) formData.append('rule_content', content)
       if (file) formData.append('file', file)
       if (connector_type) formData.append('connector_type', connector_type)
-      if (dataset_type) formData.append('dataset_type', dataset_type)
       
-      const res = await api.post('/api/rule-books/create', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      const res = await api.post('/api/rule-books/create', formData)
       dispatch(fetchRuleBooks())
       return res.data
     } catch (e) {
