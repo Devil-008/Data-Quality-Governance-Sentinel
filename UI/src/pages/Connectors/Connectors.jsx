@@ -11,6 +11,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   fetchConnectors, createConnector, testConnection, deleteConnector, updateConnector, 
   clearTestResult, testExistingConnector,
@@ -61,6 +62,7 @@ const TYPE_FIELDS = {
 
 const Connectors = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { list, loading, error, testResult, testLoading } =
     useSelector((s) => s.connectors);
 

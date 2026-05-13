@@ -1,126 +1,160 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import api from '../../api/axios'
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import api from "../../api/axios";
 
 export const fetchRuleBooks = createAsyncThunk(
-  'ruleBooks/list',
+  "ruleBooks/list",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get('/api/rule-books/list')
-      return res.data
+      const res = await api.get("/api/rule-books/list");
+      return res.data;
     } catch (e) {
-      return rejectWithValue(e.response?.data?.detail || 'Failed to load rule books')
+      return rejectWithValue(
+        e.response?.data?.detail || "Failed to load rule books",
+      );
     }
   },
-)
+);
 
 export const createRuleBook = createAsyncThunk(
-  'ruleBooks/create',
-  async ({ name, description, file, connector_type }, { rejectWithValue, dispatch }) => {
+  "ruleBooks/create",
+  async ({ file }, { rejectWithValue, dispatch }) => {
     try {
-      const formData = new FormData()
-      formData.append('name', name)
-      if (description) formData.append('description', description)
-      if (file) formData.append('file', file)
-      if (connector_type) formData.append('connector_type', connector_type)
-      
-      const res = await api.post('/api/rule-books/create', formData)
-      dispatch(fetchRuleBooks())
-      return res.data
+      const formData = new FormData();
+      if (file) formData.append("file", file);
+
+      const res = await api.post("/api/rule-books/create", formData);
+      dispatch(fetchRuleBooks());
+      return res.data;
     } catch (e) {
-      return rejectWithValue(e.response?.data?.detail || 'Failed to create rule book')
+      return rejectWithValue(
+        e.response?.data?.detail || "Failed to create rule book",
+      );
     }
   },
-)
+);
 
 export const deleteRuleBook = createAsyncThunk(
-  'ruleBooks/delete',
+  "ruleBooks/delete",
   async (id, { rejectWithValue, dispatch }) => {
     try {
-      await api.delete(`/api/rule-books/${id}`)
-      dispatch(fetchRuleBooks())
-      return { id }
+      await api.delete(`/api/rule-books/${id}`);
+      dispatch(fetchRuleBooks());
+      return { id };
     } catch (e) {
-      return rejectWithValue(e.response?.data?.detail || 'Failed to delete rule book')
+      return rejectWithValue(
+        e.response?.data?.detail || "Failed to delete rule book",
+      );
     }
   },
-)
+);
 
 export const searchSimilarRuleBooks = createAsyncThunk(
-  'ruleBooks/search',
+  "ruleBooks/search",
   async ({ id, topK }, { rejectWithValue }) => {
     try {
       const res = await api.get(`/api/rule-books/${id}/search-similar`, {
         params: { top_k: topK },
-      })
-      return res.data
+      });
+      return res.data;
     } catch (e) {
-      return rejectWithValue(e.response?.data?.detail || 'Search failed')
+      return rejectWithValue(e.response?.data?.detail || "Search failed");
     }
   },
-)
+);
 
 export const fetchRuleBookRules = createAsyncThunk(
-  'ruleBooks/fetchRules',
+  "ruleBooks/fetchRules",
   async (ruleBookId, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/api/rule-books/${ruleBookId}/rules`)
-      return { ruleBookId, rules: res.data }
+      const res = await api.get(`/api/rule-books/${ruleBookId}/rules`);
+      return { ruleBookId, rules: res.data };
     } catch (e) {
-      return rejectWithValue(e.response?.data?.detail || 'Failed to load rules')
+      return rejectWithValue(
+        e.response?.data?.detail || "Failed to load rules",
+      );
     }
   },
-)
+);
 
 export const addRuleToRuleBook = createAsyncThunk(
-  'ruleBooks/addRule',
-  async ({ ruleBookId, ruleName, ruleType, ruleConfig }, { rejectWithValue, dispatch }) => {
+  "ruleBooks/addRule",
+  async (
+    { ruleBookId, ruleName, ruleType, ruleConfig },
+    { rejectWithValue, dispatch },
+  ) => {
     try {
       const res = await api.post(`/api/rule-books/${ruleBookId}/rules`, null, {
-        params: { rule_name: ruleName, rule_type: ruleType, rule_config: ruleConfig },
-      })
-      dispatch(fetchRuleBookRules(ruleBookId))
-      return res.data
+        params: {
+          rule_name: ruleName,
+          rule_type: ruleType,
+          rule_config: ruleConfig,
+        },
+      });
+      dispatch(fetchRuleBookRules(ruleBookId));
+      return res.data;
     } catch (e) {
-      return rejectWithValue(e.response?.data?.detail || 'Failed to add rule')
+      return rejectWithValue(e.response?.data?.detail || "Failed to add rule");
     }
   },
-)
+);
 
 export const deleteRuleFromRuleBook = createAsyncThunk(
-  'ruleBooks/deleteRule',
+  "ruleBooks/deleteRule",
   async ({ ruleBookId, ruleId }, { rejectWithValue, dispatch }) => {
     try {
-      await api.delete(`/api/rule-books/${ruleBookId}/rules/${ruleId}`)
-      dispatch(fetchRuleBookRules(ruleBookId))
-      return { ruleId }
+      await api.delete(`/api/rule-books/${ruleBookId}/rules/${ruleId}`);
+      dispatch(fetchRuleBookRules(ruleBookId));
+      return { ruleId };
     } catch (e) {
-      return rejectWithValue(e.response?.data?.detail || 'Failed to delete rule')
+      return rejectWithValue(
+        e.response?.data?.detail || "Failed to delete rule",
+      );
     }
   },
-)
+);
 
 const slice = createSlice({
-  name: 'ruleBooks',
-  initialState: { 
-    list: [], 
-    loading: false, 
+  name: "ruleBooks",
+  initialState: {
+    list: [],
+    loading: false,
     error: null,
     searchResults: [],
     currentRuleBookRules: [],
   },
   reducers: {
-    clearSearchResults(state) { state.searchResults = [] },
-    clearError(state) { state.error = null },
-    clearCurrentRules(state) { state.currentRuleBookRules = [] },
+    clearSearchResults(state) {
+      state.searchResults = [];
+    },
+    clearError(state) {
+      state.error = null;
+    },
+    clearCurrentRules(state) {
+      state.currentRuleBookRules = [];
+    },
   },
   extraReducers: (b) => {
-    b.addCase(fetchRuleBooks.pending, (s) => { s.loading = true; s.error = null })
-     .addCase(fetchRuleBooks.fulfilled, (s, a) => { s.loading = false; s.list = a.payload })
-     .addCase(fetchRuleBooks.rejected, (s, a) => { s.loading = false; s.error = a.payload })
-     .addCase(searchSimilarRuleBooks.fulfilled, (s, a) => { s.searchResults = a.payload })
-     .addCase(fetchRuleBookRules.fulfilled, (s, a) => { s.currentRuleBookRules = a.payload.rules })
+    b.addCase(fetchRuleBooks.pending, (s) => {
+      s.loading = true;
+      s.error = null;
+    })
+      .addCase(fetchRuleBooks.fulfilled, (s, a) => {
+        s.loading = false;
+        s.list = a.payload;
+      })
+      .addCase(fetchRuleBooks.rejected, (s, a) => {
+        s.loading = false;
+        s.error = a.payload;
+      })
+      .addCase(searchSimilarRuleBooks.fulfilled, (s, a) => {
+        s.searchResults = a.payload;
+      })
+      .addCase(fetchRuleBookRules.fulfilled, (s, a) => {
+        s.currentRuleBookRules = a.payload.rules;
+      });
   },
-})
+});
 
-export const { clearSearchResults, clearError, clearCurrentRules } = slice.actions
-export default slice.reducer
+export const { clearSearchResults, clearError, clearCurrentRules } =
+  slice.actions;
+export default slice.reducer;

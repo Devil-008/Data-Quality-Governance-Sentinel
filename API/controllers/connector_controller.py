@@ -6,18 +6,25 @@ Real connection libraries:
   - pyodbc for MSSQL (optional — falls back to a TCP probe if unavailable)
   - requests for Azure / Databricks / GitHub REST APIs
 """
+
 import json
 import socket
 import datetime
 import pymysql
 import requests
 from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from database.db_connection import fetch_all, fetch_one, execute, db_cursor
 from middleware.auth_middleware import get_current_user, require_roles
-from utils.common import logger, encrypt_config, decrypt_config, mask_secret, safe_json_loads
+from utils.common import (
+    logger,
+    encrypt_config,
+    decrypt_config,
+    mask_secret,
+    safe_json_loads,
+)
 from utils.constants import CONNECTOR_TYPES
 
 router = APIRouter(prefix="/api/connectors", tags=["connectors"])
@@ -63,6 +70,7 @@ def _test_mssql(c: Dict[str, Any]) -> Dict[str, Any]:
     database = c.get("database")
     try:
         import pyodbc  # type: ignore
+
         drivers = [d for d in pyodbc.drivers() if "SQL Server" in d]
         if not drivers:
             raise RuntimeError("No SQL Server ODBC driver installed")
@@ -100,7 +108,11 @@ def _test_azure(c: Dict[str, Any]) -> Dict[str, Any]:
     )
     if r.status_code != 200:
         raise RuntimeError(f"Azure auth failed: {r.status_code} {r.text[:200]}")
-    return {"ok": True, "token": r.json().get("access_token"), "version": "Azure token acquired"}
+    return {
+        "ok": True,
+        "token": r.json().get("access_token"),
+        "version": "Azure token acquired",
+    }
 
 
 def _test_azure_adf(c: Dict[str, Any]) -> Dict[str, Any]:
@@ -141,7 +153,10 @@ def _test_github(c: Dict[str, Any]) -> Dict[str, Any]:
     url = f"https://api.github.com/repos/{path}"
     r = requests.get(
         url,
-        headers={"Authorization": f"Bearer {c.get('token')}", "Accept": "application/vnd.github+json"},
+        headers={
+            "Authorization": f"Bearer {c.get('token')}",
+            "Accept": "application/vnd.github+json",
+        },
         timeout=10,
     )
     if r.status_code != 200:
@@ -209,7 +224,11 @@ def get_connector(cid: int, user: dict = Depends(get_current_user)):
 
 
 @router.post("/create")
-def create_connector(body: ConnectorIn, user: dict = Depends(require_roles("admin", "steward"))):
+def create_connector(
+    body: ConnectorIn,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(require_roles("admin", "steward")),
+):
     if body.type not in CONNECTOR_TYPES:
         raise HTTPException(status_code=400, detail="Invalid connector type")
     # try real test first
@@ -225,11 +244,26 @@ def create_connector(body: ConnectorIn, user: dict = Depends(require_roles("admi
         new_id = execute(
             "INSERT INTO connectors (name, type, config_json, status, last_tested_at, created_by) "
             "VALUES (%s, %s, %s, %s, %s, %s)",
-            (body.name, body.type, enc, status, datetime.datetime.utcnow(), user["user_id"]),
+            (
+                body.name,
+                body.type,
+                enc,
+                status,
+                datetime.datetime.utcnow(),
+                user["user_id"],
+            ),
         )
     except pymysql.err.IntegrityError:
         raise HTTPException(status_code=409, detail="Connector name already exists")
     row = fetch_one("SELECT * FROM connectors WHERE id=%s", (new_id,))
+
+    if status == "Connected":
+        from controllers.monitoring_controller import _run_scan
+
+        # Run scan in background
+        background_tasks.add_task(_run_scan, new_id)
+        logger.info("Scheduled auto-scan for connector %d in background", new_id)
+
     return _serialize(row)
 
 
@@ -245,7 +279,9 @@ def test_endpoint(body: ConnectorTestIn, user: dict = Depends(get_current_user))
 
 
 @router.post("/{cid}/test")
-def test_existing(cid: int, user: dict = Depends(get_current_user)):
+def test_existing(
+    cid: int, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)
+):
     row = fetch_one("SELECT type, config_json FROM connectors WHERE id=%s", (cid,))
     if not row:
         raise HTTPException(status_code=404, detail="Not found")
@@ -256,6 +292,11 @@ def test_existing(cid: int, user: dict = Depends(get_current_user)):
             "UPDATE connectors SET status='Connected', last_tested_at=%s WHERE id=%s",
             (datetime.datetime.utcnow(), cid),
         )
+        from controllers.monitoring_controller import _run_scan
+
+        # Run scan in background
+        background_tasks.add_task(_run_scan, cid)
+        logger.info("Scheduled auto-scan for connector %d in background (test)", cid)
         return {"ok": True, "details": res}
     except Exception as e:
         execute(
@@ -266,7 +307,12 @@ def test_existing(cid: int, user: dict = Depends(get_current_user)):
 
 
 @router.put("/{cid}")
-def update_connector(cid: int, body: ConnectorIn, user: dict = Depends(require_roles("admin", "steward"))):
+def update_connector(
+    cid: int,
+    body: ConnectorIn,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(require_roles("admin", "steward")),
+):
     if not fetch_one("SELECT id FROM connectors WHERE id=%s", (cid,)):
         raise HTTPException(status_code=404, detail="Connector not found")
     if body.type not in CONNECTOR_TYPES:
@@ -287,6 +333,14 @@ def update_connector(cid: int, body: ConnectorIn, user: dict = Depends(require_r
     except pymysql.err.IntegrityError:
         raise HTTPException(status_code=409, detail="Connector name already exists")
     row = fetch_one("SELECT * FROM connectors WHERE id=%s", (cid,))
+
+    if status == "Connected":
+        from controllers.monitoring_controller import _run_scan
+
+        # Run scan in background
+        background_tasks.add_task(_run_scan, cid)
+        logger.info("Scheduled auto-scan for connector %d in background (update)", cid)
+
     return _serialize(row)
 
 

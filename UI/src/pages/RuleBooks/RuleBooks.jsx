@@ -12,6 +12,9 @@ import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import DescriptionIcon from '@mui/icons-material/Description';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchRuleBooks, createRuleBook, deleteRuleBook, searchSimilarRuleBooks, clearSearchResults,
@@ -64,6 +67,8 @@ const RuleBooks = () => {
   const [newRuleName, setNewRuleName] = useState('');
   const [newRuleType, setNewRuleType] = useState('null_check');
   const [newRuleConfig, setNewRuleConfig] = useState('');
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = React.useRef(null);
 
   useEffect(() => {
     dispatch(fetchRuleBooks());
@@ -114,10 +119,7 @@ const RuleBooks = () => {
   };
 
   const openDialog = () => {
-    setName('');
-    setDescription('');
     setFile(null);
-    setConnectorType('');
     setSavingError(null);
     setDialogOpen(true);
   };
@@ -128,19 +130,12 @@ const RuleBooks = () => {
 
   const handleSave = async () => {
     setSavingError(null);
-    if (!name.trim()) {
-      setSavingError('Rule book name is required');
-      return;
-    }
     if (!file) {
       setSavingError('File is required');
       return;
     }
-    const res = await dispatch(createRuleBook({ 
-      name, 
-      description, 
+    const res = await dispatch(createRuleBook({
       file,
-      connector_type: connectorType || null,
     }));
     if (createRuleBook.fulfilled.match(res)) {
       closeDialog();
@@ -158,6 +153,45 @@ const RuleBooks = () => {
     setSearching(rb.id);
     await dispatch(searchSimilarRuleBooks({ id: rb.id, topK: 5 }));
     setSearching(null);
+  };
+
+  const handleFileSelect = (selectedFile) => {
+    if (selectedFile) {
+      if (!selectedFile.name.endsWith('.txt')) {
+        setSavingError('Only .txt files are allowed');
+        setFile(null);
+        return;
+      }
+      setFile(selectedFile);
+      setSavingError(null);
+    }
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files[0]);
+    }
+  };
+
+  const handleFileInputChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileSelect(e.target.files[0]);
+    }
   };
 
   return (
@@ -219,11 +253,6 @@ const RuleBooks = () => {
                         </Typography>
                       </TableCell>
                       <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                        <Tooltip title="Search Similar">
-                          <IconButton size="small" onClick={() => handleSearchSimilar(rb)} disabled={searching === rb.id}>
-                            {searching === rb.id ? <CircularProgress size={16} /> : <SearchIcon fontSize="small" />}
-                          </IconButton>
-                        </Tooltip>
                         <Tooltip title="Delete">
                           <IconButton size="small" color="error" onClick={() => handleDelete(rb.id)}>
                             <DeleteIcon fontSize="small" />
@@ -239,149 +268,124 @@ const RuleBooks = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Add Rule Book</DialogTitle>
+      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Upload Rule Book</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {savingError && <Alert severity="error">{savingError}</Alert>}
-            <TextField
-              label="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              fullWidth
-              required
-            />
-            <TextField
-              label="Description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              fullWidth
-              multiline
-              rows={2}
-            />
-            <TextField
-              select
-              label="Connector Type"
-              value={connectorType}
-              onChange={(e) => setConnectorType(e.target.value)}
-              fullWidth
-            >
-              {CONNECTOR_TYPES.map((t) => (
-                <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
-              ))}
-            </TextField>
+
+            {/* File Upload with Drag & Drop */}
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Upload Rule Book File (TXT only):</Typography>
-              <input
-                type="file"
-                accept=".txt"
-                onChange={(e) => setFile(e.target.files[0] || null)}
-                style={{ marginTop: 8 }}
-              />
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                Upload Rule Book File (.txt only)
+              </Typography>
+              <Box
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                sx={{
+                  border: '2px dashed',
+                  borderColor: dragActive ? 'primary.main' : 'divider',
+                  borderRadius: 2,
+                  p: 3,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  backgroundColor: dragActive ? 'action.hover' : 'action.disabledBackground',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    backgroundColor: 'action.hover',
+                  },
+                }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt"
+                  onChange={handleFileInputChange}
+                  style={{ display: 'none' }}
+                />
+
+                {file ? (
+                  <Stack alignItems="center" spacing={1}>
+                    <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {file.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {(file.size / 1024).toFixed(2)} KB
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFile(null);
+                      }}
+                      sx={{ mt: 1 }}
+                    >
+                      Remove File
+                    </Button>
+                  </Stack>
+                ) : (
+                  <Stack alignItems="center" spacing={1}>
+                    <CloudUploadIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Drag & drop your .txt file here
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      or click to browse
+                    </Typography>
+                  </Stack>
+                )}
+              </Box>
             </Box>
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDialog}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained" disabled={loading}>
-            Save
+          <Button onClick={handleSave} variant="contained" disabled={loading || !file}>
+            Upload
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer} PaperProps={{ sx: { width: { xs: '100%', md: 800 } } }}>
+      <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer} PaperProps={{ sx: { width: { xs: '100%', md: 600 } } }}>
         <Box sx={{ p: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>{selectedRuleBook?.name}</Typography>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Rule Book Details</Typography>
             <IconButton onClick={closeDrawer}><CloseIcon /></IconButton>
           </Stack>
           {selectedRuleBook ? (
-            <Box>
-              {selectedRuleBook.description && (
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {selectedRuleBook.description}
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Name</Typography>
+                <Typography variant="body2">{selectedRuleBook.name}</Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Filename</Typography>
+                <Typography variant="body2">{selectedRuleBook.filename}</Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Created</Typography>
+                <Typography variant="body2">
+                  {selectedRuleBook.created_at ? new Date(selectedRuleBook.created_at).toLocaleString() : '-'}
                 </Typography>
-              )}
-              {selectedRuleBook.filename && (
-                <Card variant="outlined" sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                      File: {selectedRuleBook.filename}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-                      Connector Type: {selectedRuleBook.connector_type || '-'}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              )}
+              </Box>
 
-              <Card variant="outlined" sx={{ mb: 2 }}>
-                <CardContent>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Validation Rules</Typography>
-                    <Button startIcon={<AddIcon />} onClick={openAddRuleDialog} variant="contained" size="small">
-                      Add Rule
-                    </Button>
-                  </Stack>
-                  {currentRuleBookRules.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
-                      No validation rules yet. Click "Add Rule" to create one.
-                    </Typography>
-                  ) : (
-                    <Stack spacing={1}>
-                      {currentRuleBookRules.map((rule) => (
-                        <Accordion key={rule.id} disableGutters>
-                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                            <Stack direction="row" spacing={2} alignItems="center" sx={{ width: '100%' }}>
-                              <Chip label={rule.rule_type} size="small" color="primary" />
-                              <Typography variant="body2" sx={{ fontWeight: 500 }}>{rule.rule_name}</Typography>
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteRule(rule.id);
-                                }}
-                                sx={{ ml: 'auto' }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Stack>
-                          </AccordionSummary>
-                          <AccordionDetails>
-                            <Typography variant="caption" color="text.secondary">
-                              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                {rule.rule_config}
-                              </pre>
-                            </Typography>
-                          </AccordionDetails>
-                        </Accordion>
-                      ))}
-                    </Stack>
-                  )}
-                </CardContent>
-              </Card>
-
-              {searchResults.length > 0 && (
-                <>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Similar Rule Books</Typography>
-                  <Card variant="outlined" sx={{ mb: 2 }}>
-                    <CardContent>
-                      <Stack spacing={1}>
-                        {searchResults.map((res, i) => (
-                          <Chip
-                            key={i}
-                            label={`${res.name} (distance: ${res.distance.toFixed(2)})`}
-                            color="primary"
-                            variant="outlined"
-                          />
-                        ))}
-                      </Stack>
-                    </CardContent>
-                  </Card>
-                </>
-              )}
-            </Box>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Content</Typography>
+                <Paper variant="outlined" sx={{ p: 2, backgroundColor: '#f5f5f5', maxHeight: 500, overflow: 'auto' }}>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                    {selectedRuleBook.content || 'Loading content...'}
+                  </Typography>
+                </Paper>
+              </Box>
+            </Stack>
           ) : (
             <Loader label="Loading..." />
           )}

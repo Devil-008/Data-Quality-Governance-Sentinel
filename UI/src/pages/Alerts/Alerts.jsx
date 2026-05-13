@@ -30,25 +30,18 @@ const Alerts = () => {
   const [searchParams] = useSearchParams();
 
   const applyFilters = () => {
-    const params = {};
-    if (filters.severity) params.severity = filters.severity;
-    if (filters.category) params.category = filters.category;
-    if (filters.status) params.status = filters.status;
-    dispatch(fetchAlerts(params));
+    // API calls removed
   };
 
   useEffect(() => {
-    dispatch(fetchAlerts());
-    // If we got here with ?id=<n>, open that alert directly
+    // API calls removed
     const id = searchParams.get('id');
     if (id) {
-      dispatch(fetchAlertDetail(Number(id)));
       setDrawerOpen(true);
     }
   }, [dispatch, searchParams]);
 
   const openDrawer = (a) => {
-    dispatch(fetchAlertDetail(a.id));
     setDrawerOpen(true);
   };
 
@@ -60,7 +53,7 @@ const Alerts = () => {
   const handleStatus = async (status) => {
     if (!detail) return;
     setUpdating(true);
-    await dispatch(updateAlertStatus({ id: detail.id, status }));
+    // API calls removed
     setUpdating(false);
     applyFilters();
   };

@@ -74,19 +74,7 @@ const Dashboard = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {hasNoConnectors && (
-        <Alert
-          severity="info"
-          sx={{ mb: 2 }}
-          action={
-            <Button color="inherit" size="small" onClick={() => navigate('/connectors')}>
-              Add Connector
-            </Button>
-          }
-        >
-          <strong>No connectors configured yet.</strong> Add a connector to start monitoring your data sources.
-        </Alert>
-      )}
+
 
       {/* Stat Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
