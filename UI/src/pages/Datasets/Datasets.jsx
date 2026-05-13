@@ -68,9 +68,18 @@ const Datasets = () => {
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>Datasets</Typography>
+         <Stack direction="row" spacing={1}>
+        <TextField
+              label="Search"
+              size="small"
+              value={filters.q}
+              onChange={(e) => handleFilterChange('q', e.target.value)}
+              sx={{ flex: 1, maxWidth: 200 }}
+            />
         <Button startIcon={<RefreshIcon />} onClick={() => applyFilters(filters)} variant="outlined">
           Refresh
         </Button>
+        </Stack>
       </Stack>
 
       <Card sx={{ mb: 2 }}>
@@ -90,7 +99,7 @@ const Datasets = () => {
               ))}
             </TextField>
             <TextField
-              label="Search name"
+              label="Search"
               size="small"
               value={filters.q}
               onChange={(e) => handleFilterChange('q', e.target.value)}
