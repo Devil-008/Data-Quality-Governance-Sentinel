@@ -73,7 +73,7 @@ const Datasets = () => {
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>Datasets</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: "text.primary"  }}>Datasets</Typography>
         <Button startIcon={<RefreshIcon />} onClick={applyFilters} variant="outlined">
           Refresh
         </Button>
@@ -122,7 +122,7 @@ const Datasets = () => {
 
       <Card>
         <CardContent>
-          {loading && (!list || list.length === 0) ? (
+          {loading ? (
             <Loader label="Loading datasets..." />
           ) : (
             <DatasetTable datasets={list} onRowClick={openProfile} />

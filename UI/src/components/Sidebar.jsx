@@ -19,7 +19,7 @@ import { logout } from '../redux/slices/authSlice';
 const drawerWidth = 240;
 
 const items = [
-  { label: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+  { label: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { label: 'Connectors', icon: <HubIcon />, path: '/connectors' },
   { label: 'Datasets', icon: <StorageIcon />, path: '/datasets' },
   { label: 'Monitoring', icon: <MonitorHeartIcon />, path: '/monitoring' },

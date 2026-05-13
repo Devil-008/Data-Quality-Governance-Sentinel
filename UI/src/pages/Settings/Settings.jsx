@@ -69,7 +69,7 @@ const SettingsPage = () => {
 
   return (
     <Box>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 3 }}>Settings</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 700, mb: 3, color: "text.primary"  }}>Settings</Typography>
 
       {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => dispatch(clearMessage())}>{message}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => dispatch(clearMessage())}>{error}</Alert>}
@@ -246,7 +246,7 @@ const SettingsPage = () => {
                 </Box>
                 <Box>
                   <Typography variant="caption" color="text.secondary">Role</Typography>
-                  <Chip label={user?.role || '-'} size="small" sx={{ mt: 0.5 }} />
+                  <Chip label={user?.role || '-'} size="small" sx={{ mt: 0.5, ml: 1 }} />
                 </Box>
               </Stack>
             </CardContent>

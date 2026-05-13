@@ -17,7 +17,7 @@ import {
 const Notifications = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { list, unread } = useSelector((s) => s.notifications);
+  const { list, unread, loading } = useSelector((s) => s.notifications);
 
   useEffect(() => {
     dispatch(fetchNotifications());
@@ -43,7 +43,7 @@ const Notifications = () => {
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Stack direction="row" spacing={1} alignItems="center">
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Notifications</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: "text.primary"  }}>Notifications</Typography>
           {unread > 0 && <Chip label={`${unread} unread`} color="error" size="small" />}
         </Stack>
         <Stack direction="row" spacing={1}>
@@ -55,8 +55,10 @@ const Notifications = () => {
       </Stack>
 
       <Card>
-        <CardContent sx={{ p: 0 }}>
-          {!list || list.length === 0 ? (
+        <CardContent sx={{ p: 0 }}> 
+          {loading ? (
+            <Loader label="Loading notifications..." />
+          ) : !list || list.length === 0 ? (
             <Box sx={{ p: 6, textAlign: 'center' }}>
               <NotificationsActiveIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
               <Typography color="text.secondary">

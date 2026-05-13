@@ -68,7 +68,7 @@ const Alerts = () => {
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>Alerts</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: "text.primary"  }}>Alerts</Typography>
         <Button startIcon={<RefreshIcon />} onClick={applyFilters} variant="outlined">Refresh</Button>
       </Stack>
 
@@ -108,7 +108,7 @@ const Alerts = () => {
 
       <Card>
         <CardContent>
-          {loading && list.length === 0 ? (
+          {loading ? (
             <Loader label="Loading alerts..." />
           ) : (
             <AlertTable alerts={list} onRowClick={openDrawer} />

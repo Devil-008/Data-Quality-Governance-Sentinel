@@ -82,7 +82,7 @@ const Monitoring = () => {
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>Monitoring</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: "text.primary"  }}>Monitoring</Typography>
         <Stack direction="row" spacing={1}>
           <Button startIcon={<RefreshIcon />} onClick={refresh} variant="outlined">Refresh</Button>
           <Button startIcon={<AddIcon />} onClick={openDialog} variant="contained">New Job</Button>
@@ -98,7 +98,7 @@ const Monitoring = () => {
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                 Scheduled Jobs ({jobs.length})
               </Typography>
-              {loading && jobs.length === 0 ? (
+              {loading ? (
                 <Loader label="Loading jobs..." />
               ) : jobs.length === 0 ? (
                 <Box sx={{ py: 4, textAlign: 'center' }}>
@@ -167,7 +167,9 @@ const Monitoring = () => {
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                 Recent Monitoring Runs ({runs.length})
               </Typography>
-              {runs.length === 0 ? (
+              {loading ? (
+                <Loader label="Loading runs..." />
+              ) : runs.length === 0 ? (
                 <Box sx={{ py: 4, textAlign: 'center' }}>
                   <Typography color="text.secondary">
                     No runs yet. Trigger a scan from the Connectors page or create a job.
@@ -232,7 +234,7 @@ const Monitoring = () => {
       </Grid>
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>New Monitoring Job</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: "text.primary"  }}>New Monitoring Job</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {formError && <Alert severity="error">{formError}</Alert>}
