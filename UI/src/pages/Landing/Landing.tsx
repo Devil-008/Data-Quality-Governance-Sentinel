@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import {
   ArrowUpRight, ShieldCheck, Workflow, Database, Brain, AlertTriangle,
@@ -29,6 +30,15 @@ const AGENTS = [
 ];
 
 export default function Landing() {
+  const navigate = useNavigate();
+  const { token } = useSelector((state: any) => state.auth);
+
+  useEffect(() => {
+    if (token) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [token, navigate]);
+
   const { scrollYProgress } = useScroll();
   const heroY = useTransform(scrollYProgress, [0, 0.3], [0, -80]);
 

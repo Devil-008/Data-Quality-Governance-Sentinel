@@ -5,6 +5,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import Layout from '../components/Layout';
 import Landing from '../pages/Landing/Landing';
 import Login from '../pages/Login/Login';
+// import Login2 from '../pages/Login/Login2';
 import Dashboard from '../pages/Dashboard/Dashboard';
 import Connectors from '../pages/Connectors/Connectors';
 import Datasets from '../pages/Datasets/Datasets';
@@ -17,6 +18,7 @@ const AppRoutes = () => {
   return (
     <Routes>
  <Route path="/" element={<Landing />} />
+      {/* <Route path="/login" element={<Login2 />} /> */}
       <Route path="/login" element={<Login />} />
       <Route
         element={
@@ -25,7 +27,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/connectors" element={<Connectors />} />
         <Route path="/datasets" element={<Datasets />} />
         <Route path="/monitoring" element={<Monitoring />} />
