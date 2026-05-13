@@ -40,6 +40,21 @@ def _process_unchecked_datasets():
             try:
                 dataset_id = dataset["id"]
 
+                # Skip quality checks for datasets without columns (jobs/pipelines/clusters)
+                if dataset.get("column_count", 0) == 0:
+                    logger.info(
+                        "Skipping quality check for schema-less dataset: id=%d, name=%s (type=%s)",
+                        dataset_id,
+                        dataset["dataset_name"],
+                        dataset.get("dataset_type"),
+                    )
+                    # Set default score for schema-less items
+                    execute(
+                        "UPDATE datasets SET quality_score=%s WHERE id=%s",
+                        (75.0, dataset_id),  # Neutral score for schema-less items
+                    )
+                    continue
+
                 logger.info(
                     "Running quality checks on dataset: id=%d, name=%s",
                     dataset_id,
@@ -60,14 +75,23 @@ def _process_unchecked_datasets():
                     _run_ai_quality_checks(dataset_id, dataset, sample_rows=None)
                 )
 
+                logger.info(
+                    "AI checks returned: dataset=%d, score=%.1f, issues=%d, pii_cats=%s",
+                    dataset_id,
+                    quality_score,
+                    len(issues),
+                    pii_categories,
+                )
+
                 # Format PII categories
                 pii_cats_str = ",".join(pii_categories) if pii_categories else None
+                contains_pii = 1 if pii_categories else 0
 
                 # Update dataset with quality score and PII info
                 now = datetime.datetime.utcnow()
                 execute(
-                    "UPDATE datasets SET quality_score=%s, pii_categories=%s, last_profiled_at=%s WHERE id=%s",
-                    (quality_score, pii_cats_str, now, dataset_id),
+                    "UPDATE datasets SET quality_score=%s, pii_categories=%s, contains_pii=%s, last_profiled_at=%s WHERE id=%s",
+                    (quality_score, pii_cats_str, contains_pii, now, dataset_id),
                 )
 
                 logger.info(
@@ -145,11 +169,11 @@ def start():
         _scheduler.add_job(
             _process_unchecked_datasets,
             "interval",
-            minutes=10,  # Run every 10 minutes
+            minutes=1,  # Run every 1 minute
             id="quality_check_scheduler",
         )
         _scheduler.start()
-        logger.info("Quality check scheduler started (10 min interval)")
+        logger.info("Quality check scheduler started (1 min interval)")
 
 
 def stop():

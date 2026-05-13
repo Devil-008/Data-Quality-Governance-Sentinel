@@ -57,11 +57,11 @@ def start_scheduler():
     with _lock:
         if _scheduler is not None:
             return _scheduler
-        sched = BackgroundScheduler(timezone="UTC", job_defaults={"coalesce": True, "max_instances": 1})
-        sched.add_job(_tick, "interval", minutes=1, id="dq_tick", replace_existing=True)
+        sched = BackgroundScheduler(timezone="UTC", job_defaults={"coalesce": True, "max_instances": 5})
+        sched.add_job(_tick, "interval", minutes=5, id="dq_tick", replace_existing=True)
         sched.start()
         _scheduler = sched
-        logger.info("APScheduler started (1-minute tick).")
+        logger.info("APScheduler started (5-minute tick).")
         return sched
 
 

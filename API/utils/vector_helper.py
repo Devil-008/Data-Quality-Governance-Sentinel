@@ -1,4 +1,5 @@
 """Vector DB helper using Chroma DB for rule books and monitoring logs."""
+
 import os
 import json
 import uuid
@@ -31,7 +32,9 @@ def _get_client() -> chromadb.Client:
 
 
 def _get_embedding_function():
-    return embedding_functions.SentenceTransformerEmbeddingFunction(model_name=MODEL_NAME)
+    return embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name=MODEL_NAME
+    )
 
 
 def _get_rule_book_collection() -> chromadb.Collection:
@@ -60,64 +63,118 @@ def _get_monitoring_log_collection() -> chromadb.Collection:
     return _monitoring_log_collection
 
 
-def _chunk_text(text: str, chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP) -> List[str]:
-    """Split text into overlapping chunks."""
-    chunks = []
+def _chunk_text_generator(
+    text: str, chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP
+):
+    """Generate overlapping chunks from text (memory-efficient generator)."""
     start = 0
     text_length = len(text)
-    
+
     while start < text_length:
         end = min(start + chunk_size, text_length)
-        
+
         if end < text_length:
-            last_space = text.rfind(' ', start, end)
-            last_newline = text.rfind('\n', start, end)
+            last_space = text.rfind(" ", start, end)
+            last_newline = text.rfind("\n", start, end)
             if last_newline > start:
                 end = last_newline + 1
             elif last_space > start:
                 end = last_space + 1
-        
-        chunks.append(text[start:end])
+
+        yield text[start:end]
         start = end - chunk_overlap
-        
+
         if start < 0:
             start = 0
-    
-    return chunks
 
 
-def add_rule_book_to_index(text: str, rule_book_id: int, name: str, metadata: Optional[Dict[str, Any]] = None) -> List[str]:
+def _chunk_text(
+    text: str, chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP
+) -> List[str]:
+    """Split text into overlapping chunks. Use generator version for large texts."""
+    return list(_chunk_text_generator(text, chunk_size, chunk_overlap))
+
+
+def add_rule_book_to_index(
+    text: str, rule_book_id: int, name: str, metadata: Optional[Dict[str, Any]] = None
+) -> List[str]:
     """Add rule book to Chroma DB with proper chunking and metadata."""
-    collection = _get_rule_book_collection()
-    chunks = _chunk_text(text)
-    
-    doc_ids = []
-    documents = []
-    metadatas = []
-    
-    for i, chunk in enumerate(chunks):
-        doc_id = f"rule_book_{rule_book_id}_chunk_{i}_{uuid.uuid4().hex[:8]}"
-        chunk_metadata = {
-            "type": "rule_book",
-            "rulebook_id": rule_book_id,
-            "name": name,
-            "chunk_index": i,
-            "total_chunks": len(chunks),
-        }
-        if metadata:
-            chunk_metadata.update(metadata)
-        
-        doc_ids.append(doc_id)
-        documents.append(chunk)
-        metadatas.append(chunk_metadata)
-    
-    collection.add(
-        documents=documents,
-        metadatas=metadatas,
-        ids=doc_ids,
-    )
-    logger.info("Rule book added to Chroma DB: id=%s, chunks=%d", rule_book_id, len(chunks))
-    return doc_ids
+    try:
+        logger.debug(
+            "Getting rule book collection for indexing rule book %d", rule_book_id
+        )
+        collection = _get_rule_book_collection()
+
+        logger.debug(
+            "Chunking text for rule book %d (size=%d)", rule_book_id, len(text)
+        )
+
+        # Process chunks in batches to avoid memory overflow
+        batch_size = 100  # Process 100 chunks at a time
+        doc_ids = []
+        chunk_index = 0
+
+        batch_docs = []
+        batch_metadatas = []
+        batch_ids = []
+
+        for chunk in _chunk_text_generator(text):
+            doc_id = (
+                f"rule_book_{rule_book_id}_chunk_{chunk_index}_{uuid.uuid4().hex[:8]}"
+            )
+            chunk_metadata = {
+                "type": "rule_book",
+                "rulebook_id": rule_book_id,
+                "name": name,
+                "chunk_index": chunk_index,
+            }
+            if metadata:
+                chunk_metadata.update(metadata)
+
+            batch_docs.append(chunk)
+            batch_metadatas.append(chunk_metadata)
+            batch_ids.append(doc_id)
+            doc_ids.append(doc_id)
+            chunk_index += 1
+
+            # Add batch to ChromaDB when batch size is reached
+            if len(batch_docs) >= batch_size:
+                logger.debug(
+                    "Adding batch of %d chunks for rule book %d",
+                    len(batch_docs),
+                    rule_book_id,
+                )
+                collection.add(
+                    documents=batch_docs,
+                    metadatas=batch_metadatas,
+                    ids=batch_ids,
+                )
+                batch_docs = []
+                batch_metadatas = []
+                batch_ids = []
+
+        # Add remaining chunks
+        if batch_docs:
+            logger.debug(
+                "Adding final batch of %d chunks for rule book %d",
+                len(batch_docs),
+                rule_book_id,
+            )
+            collection.add(
+                documents=batch_docs,
+                metadatas=batch_metadatas,
+                ids=batch_ids,
+            )
+
+        logger.info(
+            "Rule book added to Chroma DB: id=%s, chunks=%d", rule_book_id, chunk_index
+        )
+        return doc_ids
+    except Exception as e:
+        logger.exception(
+            "Failed to add rule book %d to ChromaDB: %s", rule_book_id, str(e)
+        )
+        raise
 
 
 def add_monitoring_log_to_index(text: str, log_id: int, log_type: str) -> str:
@@ -132,28 +189,34 @@ def add_monitoring_log_to_index(text: str, log_id: int, log_type: str) -> str:
     return doc_id
 
 
-def search_rule_books(query: str, top_k: int = 5, connector_type: Optional[str] = None) -> List[Dict[str, Any]]:
+def search_rule_books(
+    query: str, top_k: int = 5, connector_type: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Search rule books with optional connector_type filter."""
     collection = _get_rule_book_collection()
-    
+
     where = {}
     if connector_type:
         where["connector_type"] = connector_type
-    
+
     results = collection.query(
         query_texts=[query],
         n_results=top_k,
         where=where if where else None,
     )
-    
+
     output = []
     for i in range(len(results["ids"][0])):
-        output.append({
-            "id": results["ids"][0][i],
-            "document": results["documents"][0][i] if results["documents"] else None,
-            "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
-            "distance": results["distances"][0][i] if results["distances"] else 0,
-        })
+        output.append(
+            {
+                "id": results["ids"][0][i],
+                "document": (
+                    results["documents"][0][i] if results["documents"] else None
+                ),
+                "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
+                "distance": results["distances"][0][i] if results["distances"] else 0,
+            }
+        )
     return output
 
 
@@ -165,10 +228,12 @@ def search_monitoring_logs(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     )
     output = []
     for i in range(len(results["ids"][0])):
-        output.append({
-            **(results["metadatas"][0][i] if results["metadatas"] else {}),
-            "distance": results["distances"][0][i] if results["distances"] else 0,
-        })
+        output.append(
+            {
+                **(results["metadatas"][0][i] if results["metadatas"] else {}),
+                "distance": results["distances"][0][i] if results["distances"] else 0,
+            }
+        )
     return output
 
 
@@ -176,9 +241,7 @@ def delete_rule_book_from_index(rule_book_id: int) -> None:
     """Delete all chunks for a specific rule book."""
     collection = _get_rule_book_collection()
     try:
-        collection.delete(
-            where={"rulebook_id": rule_book_id}
-        )
+        collection.delete(where={"rulebook_id": rule_book_id})
         logger.info("Rule book deleted from Chroma DB: id=%s", rule_book_id)
     except Exception as e:
         logger.warning("Failed to delete rule book from index: %s", e)
@@ -196,6 +259,7 @@ def clear_index():
             logger.warning("Failed to delete collections: %s", e)
     _client = None
     import shutil
+
     if os.path.exists(CHROMA_PERSIST_DIR):
         shutil.rmtree(CHROMA_PERSIST_DIR, ignore_errors=True)
     logger.info("Chroma DB index cleared")

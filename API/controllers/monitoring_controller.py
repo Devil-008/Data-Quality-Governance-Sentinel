@@ -33,6 +33,7 @@ router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
 
 
 def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
+    logger.info("Starting Azure ADF scan for connector: %s", conn_row.get("name"))
 
     cfg = decrypt_config(conn_row["config_json"])
 
@@ -42,6 +43,7 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
 
     discovered = []
 
+    logger.debug("Getting Azure token for tenant: %s", tenant)
     token_r = requests.post(
         f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
         data={
@@ -54,7 +56,8 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
     )
 
     if token_r.status_code != 200:
-        raise RuntimeError(token_r.text)
+        logger.error("Failed to get Azure token: %s", token_r.text[:200])
+        raise RuntimeError(f"Azure auth failed: {token_r.status_code}")
 
     tok = token_r.json()["access_token"]
 
@@ -67,6 +70,7 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
     headers = {"Authorization": f"Bearer {tok}"}
 
     # DATASETS
+    logger.debug("Fetching datasets from: %s", f"{base}/datasets")
     ds_r = requests.get(
         f"{base}/datasets?api-version=2018-06-01",
         headers=headers,
@@ -74,10 +78,10 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
     )
 
     if ds_r.status_code == 200:
-        for ds in ds_r.json().get("value", []):
-
+        datasets = ds_r.json().get("value", [])
+        logger.info("Found %d datasets in ADF", len(datasets))
+        for ds in datasets:
             props = ds.get("properties", {})
-
             discovered.append(
                 {
                     "schema": "adf",
@@ -87,8 +91,13 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
                     "columns": [],
                 }
             )
+    else:
+        logger.warning(
+            "Failed to fetch ADF datasets: %s %s", ds_r.status_code, ds_r.text[:200]
+        )
 
     # PIPELINES
+    logger.debug("Fetching pipelines from: %s", f"{base}/pipelines")
     pl_r = requests.get(
         f"{base}/pipelines?api-version=2018-06-01",
         headers=headers,
@@ -96,8 +105,9 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
     )
 
     if pl_r.status_code == 200:
-        for p in pl_r.json().get("value", []):
-
+        pipelines = pl_r.json().get("value", [])
+        logger.info("Found %d pipelines in ADF", len(pipelines))
+        for p in pipelines:
             discovered.append(
                 {
                     "schema": "adf",
@@ -107,7 +117,12 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
                     "columns": [],
                 }
             )
+    else:
+        logger.warning(
+            "Failed to fetch ADF pipelines: %s %s", pl_r.status_code, pl_r.text[:200]
+        )
 
+    logger.info("Azure ADF scan complete: discovered %d items", len(discovered))
     return {"datasets": discovered}
 
 
@@ -1363,7 +1378,7 @@ def _run_scan(connector_id: int) -> Dict[str, Any]:
                     "SELECT d.*, c.name AS connector_name FROM datasets d JOIN connectors c ON d.connector_id=c.id WHERE d.id=%s",
                     (ds_id,),
                 )
-                if ds_full:
+                if ds_full and ds_full.get("column_count", 0) > 0:
                     issues, quality_score, _, pii_cols, pii_cats = (
                         _run_ai_quality_checks(ds_id, ds_full)
                     )
@@ -2020,3 +2035,50 @@ def get_quality_checks(connector_type: str, user: dict = Depends(get_current_use
         "connector_type": connector_type,
         "quality_checks": QUALITY_CHECKS[connector_type],
     }
+
+
+@router.get("/debug/rule-books")
+def debug_rule_books(user: dict = Depends(require_roles("admin"))):
+    """Debug endpoint: Check if rule books are in ChromaDB and search for one."""
+    try:
+        # Search for any rule book
+        results = search_rule_books("quality check", top_k=5)
+
+        rule_books = fetch_all(
+            "SELECT id, name, filename FROM rule_books ORDER BY id DESC LIMIT 10"
+        )
+
+        return {
+            "status": "ok",
+            "rule_books_in_db": len(rule_books),
+            "rule_books_list": rule_books,
+            "chroma_search_results": results,
+            "chroma_results_count": len(results),
+        }
+    except Exception as e:
+        logger.error("Debug rule books failed: %s", e)
+        return {
+            "status": "error",
+            "error": str(e),
+        }
+
+
+@router.post("/manual-scan/{connector_id}")
+def manual_trigger_scan(
+    connector_id: int,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(require_roles("admin")),
+):
+    """Manually trigger a scan for a connector."""
+    try:
+        conn = fetch_one("SELECT id, name FROM connectors WHERE id=%s", (connector_id,))
+        if not conn:
+            raise HTTPException(status_code=404, detail="Connector not found")
+
+        background_tasks.add_task(_run_scan, connector_id)
+        logger.info("Scan triggered for connector %d (%s)", connector_id, conn["name"])
+
+        return {"status": "ok", "message": f"Scan queued for {conn['name']}"}
+    except Exception as e:
+        logger.error("Manual scan trigger failed: %s", e)
+        return {"status": "error", "error": str(e)}

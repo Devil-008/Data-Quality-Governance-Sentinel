@@ -62,6 +62,20 @@ export const searchSimilarRuleBooks = createAsyncThunk(
   },
 );
 
+export const fetchRuleBookDetails = createAsyncThunk(
+  "ruleBooks/fetchDetails",
+  async (ruleBookId, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/api/rule-books/${ruleBookId}`);
+      return res.data;
+    } catch (e) {
+      return rejectWithValue(
+        e.response?.data?.detail || "Failed to load rule book details",
+      );
+    }
+  },
+);
+
 export const fetchRuleBookRules = createAsyncThunk(
   "ruleBooks/fetchRules",
   async (ruleBookId, { rejectWithValue }) => {
@@ -121,6 +135,8 @@ const slice = createSlice({
     error: null,
     searchResults: [],
     currentRuleBookRules: [],
+    selectedRuleBook: null,
+    selectedRuleBookLoading: false,
   },
   reducers: {
     clearSearchResults(state) {
@@ -145,6 +161,16 @@ const slice = createSlice({
       .addCase(fetchRuleBooks.rejected, (s, a) => {
         s.loading = false;
         s.error = a.payload;
+      })
+      .addCase(fetchRuleBookDetails.pending, (s) => {
+        s.selectedRuleBookLoading = true;
+      })
+      .addCase(fetchRuleBookDetails.fulfilled, (s, a) => {
+        s.selectedRuleBookLoading = false;
+        s.selectedRuleBook = a.payload;
+      })
+      .addCase(fetchRuleBookDetails.rejected, (s) => {
+        s.selectedRuleBookLoading = false;
       })
       .addCase(searchSimilarRuleBooks.fulfilled, (s, a) => {
         s.searchResults = a.payload;

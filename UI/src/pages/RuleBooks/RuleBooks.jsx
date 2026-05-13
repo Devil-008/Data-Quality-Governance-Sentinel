@@ -18,7 +18,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchRuleBooks, createRuleBook, deleteRuleBook, searchSimilarRuleBooks, clearSearchResults,
-  fetchRuleBookRules, addRuleToRuleBook, deleteRuleFromRuleBook, clearCurrentRules,
+  fetchRuleBookRules, addRuleToRuleBook, deleteRuleFromRuleBook, clearCurrentRules, fetchRuleBookDetails,
 } from '../../redux/slices/ruleBookSlice';
 import Loader from '../../components/Loader';
 
@@ -52,7 +52,7 @@ const DATASET_TYPES = [
 
 const RuleBooks = () => {
   const dispatch = useDispatch();
-  const { list, loading, error, searchResults, currentRuleBookRules } = useSelector((s) => s.ruleBooks);
+  const { list, loading, error, searchResults, currentRuleBookRules, selectedRuleBook: reduxSelectedRuleBook, selectedRuleBookLoading } = useSelector((s) => s.ruleBooks);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
@@ -68,6 +68,7 @@ const RuleBooks = () => {
   const [newRuleType, setNewRuleType] = useState('null_check');
   const [newRuleConfig, setNewRuleConfig] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = React.useRef(null);
 
   useEffect(() => {
@@ -79,6 +80,7 @@ const RuleBooks = () => {
     setDrawerOpen(true);
     dispatch(clearSearchResults());
     dispatch(fetchRuleBookRules(rb.id));
+    dispatch(fetchRuleBookDetails(rb.id));
   };
 
   const closeDrawer = () => {
@@ -134,9 +136,11 @@ const RuleBooks = () => {
       setSavingError('File is required');
       return;
     }
+    setUploading(true);
     const res = await dispatch(createRuleBook({
       file,
     }));
+    setUploading(false);
     if (createRuleBook.fulfilled.match(res)) {
       closeDialog();
     } else {
@@ -271,82 +275,88 @@ const RuleBooks = () => {
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Upload Rule Book</DialogTitle>
         <DialogContent dividers>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            {savingError && <Alert severity="error">{savingError}</Alert>}
-
-            {/* File Upload with Drag & Drop */}
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                Upload Rule Book File (.txt only)
-              </Typography>
-              <Box
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                sx={{
-                  border: '2px dashed',
-                  borderColor: dragActive ? 'primary.main' : 'divider',
-                  borderRadius: 2,
-                  p: 3,
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  backgroundColor: dragActive ? 'action.hover' : 'action.disabledBackground',
-                  '&:hover': {
-                    borderColor: 'primary.main',
-                    backgroundColor: 'action.hover',
-                  },
-                }}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".txt"
-                  onChange={handleFileInputChange}
-                  style={{ display: 'none' }}
-                />
-
-                {file ? (
-                  <Stack alignItems="center" spacing={1}>
-                    <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {file.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {(file.size / 1024).toFixed(2)} KB
-                    </Typography>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFile(null);
-                      }}
-                      sx={{ mt: 1 }}
-                    >
-                      Remove File
-                    </Button>
-                  </Stack>
-                ) : (
-                  <Stack alignItems="center" spacing={1}>
-                    <CloudUploadIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Drag & drop your .txt file here
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      or click to browse
-                    </Typography>
-                  </Stack>
-                )}
-              </Box>
+          {uploading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+              <Loader label="Uploading rule book..." />
             </Box>
-          </Stack>
+          ) : (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              {savingError && <Alert severity="error">{savingError}</Alert>}
+
+              {/* File Upload with Drag & Drop */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                  Upload Rule Book File (.txt only)
+                </Typography>
+                <Box
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  sx={{
+                    border: '2px dashed',
+                    borderColor: dragActive ? 'primary.main' : 'divider',
+                    borderRadius: 2,
+                    p: 3,
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    backgroundColor: dragActive ? 'action.hover' : 'action.disabledBackground',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      backgroundColor: 'action.hover',
+                    },
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".txt"
+                    onChange={handleFileInputChange}
+                    style={{ display: 'none' }}
+                  />
+
+                  {file ? (
+                    <Stack alignItems="center" spacing={1}>
+                      <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main' }} />
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {file.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {(file.size / 1024).toFixed(2)} KB
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFile(null);
+                        }}
+                        sx={{ mt: 1 }}
+                      >
+                        Remove File
+                      </Button>
+                    </Stack>
+                  ) : (
+                    <Stack alignItems="center" spacing={1}>
+                      <CloudUploadIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Drag & drop your .txt file here
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        or click to browse
+                      </Typography>
+                    </Stack>
+                  )}
+                </Box>
+              </Box>
+            </Stack>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeDialog}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained" disabled={loading || !file}>
+          <Button onClick={closeDialog} disabled={uploading}>Cancel</Button>
+          <Button onClick={handleSave} variant="contained" disabled={uploading || !file}>
             Upload
           </Button>
         </DialogActions>
@@ -358,22 +368,26 @@ const RuleBooks = () => {
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Rule Book Details</Typography>
             <IconButton onClick={closeDrawer}><CloseIcon /></IconButton>
           </Stack>
-          {selectedRuleBook ? (
+          {selectedRuleBookLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+              <CircularProgress />
+            </Box>
+          ) : reduxSelectedRuleBook ? (
             <Stack spacing={2}>
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Name</Typography>
-                <Typography variant="body2">{selectedRuleBook.name}</Typography>
+                <Typography variant="body2">{reduxSelectedRuleBook.name}</Typography>
               </Box>
 
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Filename</Typography>
-                <Typography variant="body2">{selectedRuleBook.filename}</Typography>
+                <Typography variant="body2">{reduxSelectedRuleBook.filename}</Typography>
               </Box>
 
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Created</Typography>
                 <Typography variant="body2">
-                  {selectedRuleBook.created_at ? new Date(selectedRuleBook.created_at).toLocaleString() : '-'}
+                  {reduxSelectedRuleBook.created_at ? new Date(reduxSelectedRuleBook.created_at).toLocaleString() : '-'}
                 </Typography>
               </Box>
 
@@ -381,13 +395,13 @@ const RuleBooks = () => {
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Content</Typography>
                 <Paper variant="outlined" sx={{ p: 2, backgroundColor: '#f5f5f5', maxHeight: 500, overflow: 'auto' }}>
                   <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                    {selectedRuleBook.content || 'Loading content...'}
+                    {reduxSelectedRuleBook.content || 'No content'}
                   </Typography>
                 </Paper>
               </Box>
             </Stack>
           ) : (
-            <Loader label="Loading..." />
+            <Typography color="text.secondary">No rule book selected</Typography>
           )}
         </Box>
       </Drawer>

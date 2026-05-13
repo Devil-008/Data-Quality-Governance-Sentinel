@@ -37,7 +37,24 @@ def _extract_text_from_file(file: UploadFile) -> str:
 @router.get("/list")
 def list_rule_books(user: dict = Depends(get_current_user)):
     try:
-        return fetch_all("SELECT * FROM rule_books ORDER BY created_at DESC")
+        rule_books = fetch_all("SELECT * FROM rule_books ORDER BY created_at DESC")
+        # Filter: only return rule books that are properly indexed (file exists + in ChromaDB)
+        valid_books = []
+        for rb in rule_books:
+            if rb.get("file_path") and os.path.exists(rb["file_path"]):
+                valid_books.append(rb)
+            else:
+                logger.warning(
+                    "Rule book %d (%s) file missing, removing from index",
+                    rb.get("id"),
+                    rb.get("name"),
+                )
+                try:
+                    delete_rule_book_from_index(rb.get("id"))
+                    execute("DELETE FROM rule_books WHERE id=%s", (rb.get("id"),))
+                except Exception as e:
+                    logger.warning("Failed to cleanup orphaned rule book %d: %s", rb.get("id"), e)
+        return valid_books
     except Exception as e:
         logger.warning("rule_books table not found: %s", e)
         return []
@@ -103,6 +120,7 @@ def create_rule_book(
         )
         rule_book_id = result
 
+        # Add to ChromaDB - if this fails, delete from DB
         try:
             metadata = {
                 "filename": file.filename,
@@ -112,10 +130,21 @@ def create_rule_book(
             add_rule_book_to_index(content, rule_book_id, auto_name, metadata)
             logger.info("Rule book %d added to vector index", rule_book_id)
         except Exception as e:
-            logger.warning("Failed to add rule book to vector index: %s", e)
+            logger.exception("Failed to add rule book to ChromaDB, rolling back")
+            # Rollback: delete from DB and disk
+            try:
+                execute("DELETE FROM rule_books WHERE id=%s", (rule_book_id,))
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception as cleanup_e:
+                logger.warning("Cleanup failed: %s", cleanup_e)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to index rule book: {str(e)[:100]}",
+            )
 
         logger.info(
-            "Created rule book: id=%d, name=%s, file=%s",
+            "Created rule book: id=%d, name=%s, file=%s (indexed)",
             rule_book_id,
             auto_name,
             file.filename,
@@ -124,7 +153,7 @@ def create_rule_book(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to create rule book: %s", e)
+        logger.exception("Failed to create rule book")
         raise HTTPException(status_code=500, detail="Failed to create rule book")
 
 

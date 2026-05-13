@@ -169,7 +169,7 @@ const Datasets = () => {
               <Card variant="outlined" sx={{ mb: 3, bgcolor: '#f8f9fa' }}>
                 <CardContent>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <span role="img" aria-label="sparkles">✨</span> AI Overall Summary
+                    <span role="img" aria-label="sparkles">✨</span> Overall Summary
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {profile.dataset.quality_score != null || profile.dataset.contains_pii != null ? (
