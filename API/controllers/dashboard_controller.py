@@ -14,7 +14,7 @@ def overview(user: dict = Depends(get_current_user)):
         """
         SELECT
           (SELECT COUNT(*) FROM connectors) AS total_connectors,
-          (SELECT COUNT(*) FROM connectors WHERE status='healthy') AS healthy_connectors,
+          (SELECT COUNT(*) FROM connectors WHERE status='Connected') AS healthy_connectors,
           (SELECT COUNT(*) FROM datasets) AS dataset_count,
           (SELECT COUNT(*) FROM datasets WHERE contains_pii=1) AS pii_datasets,
           (SELECT COUNT(*) FROM alerts WHERE severity IN ('critical','high') AND status='open') AS critical_alerts,

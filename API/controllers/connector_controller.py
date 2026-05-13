@@ -216,10 +216,10 @@ def create_connector(body: ConnectorIn, user: dict = Depends(require_roles("admi
     status = "unknown"
     try:
         test_connection(body.type, body.config)
-        status = "healthy"
+        status = "Connected"
     except Exception as e:
         logger.warning("Create connector test failed: %s", e)
-        status = "unhealthy"
+        status = "Connection Failed"
     enc = encrypt_config(body.config)
     try:
         new_id = execute(
@@ -253,16 +253,41 @@ def test_existing(cid: int, user: dict = Depends(get_current_user)):
     try:
         res = test_connection(row["type"], cfg)
         execute(
-            "UPDATE connectors SET status='healthy', last_tested_at=%s WHERE id=%s",
+            "UPDATE connectors SET status='Connected', last_tested_at=%s WHERE id=%s",
             (datetime.datetime.utcnow(), cid),
         )
         return {"ok": True, "details": res}
     except Exception as e:
         execute(
-            "UPDATE connectors SET status='unhealthy', last_tested_at=%s WHERE id=%s",
+            "UPDATE connectors SET status='Connection Failed', last_tested_at=%s WHERE id=%s",
             (datetime.datetime.utcnow(), cid),
         )
         return {"ok": False, "error": str(e)}
+
+
+@router.put("/{cid}")
+def update_connector(cid: int, body: ConnectorIn, user: dict = Depends(require_roles("admin", "steward"))):
+    if not fetch_one("SELECT id FROM connectors WHERE id=%s", (cid,)):
+        raise HTTPException(status_code=404, detail="Connector not found")
+    if body.type not in CONNECTOR_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid connector type")
+    status = "unknown"
+    try:
+        test_connection(body.type, body.config)
+        status = "Connected"
+    except Exception as e:
+        logger.warning("Update connector test failed: %s", e)
+        status = "Connection Failed"
+    enc = encrypt_config(body.config)
+    try:
+        execute(
+            "UPDATE connectors SET name=%s, type=%s, config_json=%s, status=%s, last_tested_at=%s WHERE id=%s",
+            (body.name, body.type, enc, status, datetime.datetime.utcnow(), cid),
+        )
+    except pymysql.err.IntegrityError:
+        raise HTTPException(status_code=409, detail="Connector name already exists")
+    row = fetch_one("SELECT * FROM connectors WHERE id=%s", (cid,))
+    return _serialize(row)
 
 
 @router.delete("/{cid}")
