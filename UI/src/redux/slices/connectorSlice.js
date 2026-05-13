@@ -81,6 +81,22 @@ export const qualityCheckAllDatasets = createAsyncThunk(
   },
 );
 
+export const updateConnector = createAsyncThunk(
+  'connectors/update',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await api.put(`/api/connectors/${payload.id}`, { 
+        name: payload.name, 
+        type: payload.type, 
+        config: payload.config 
+      });
+      return res.data;
+    } catch (e) {
+      return rejectWithValue(e.response?.data?.detail || 'Failed to update connector');
+    }
+  },
+);
+
 export const deleteConnector = createAsyncThunk(
   'connectors/delete',
   async (id, { rejectWithValue }) => {
@@ -119,6 +135,11 @@ const slice = createSlice({
      .addCase(createConnector.pending, (s) => { s.loading = true; })
      .addCase(createConnector.fulfilled, (s, a) => { s.loading = false; s.list = [a.payload, ...s.list]; })
      .addCase(createConnector.rejected, (s, a) => { s.loading = false; s.error = a.payload; })
+     .addCase(updateConnector.fulfilled, (s, a) => { 
+       s.loading = false; 
+       s.list = s.list.map((c) => c.id === a.payload.id ? a.payload : c); 
+     })
+     .addCase(updateConnector.rejected, (s, a) => { s.loading = false; s.error = a.payload; })
      .addCase(deleteConnector.fulfilled, (s, a) => { s.list = s.list.filter((c) => c.id !== a.payload); })
      .addCase(testConnection.pending, (s) => { s.testLoading = true; s.testResult = null; })
      .addCase(testConnection.fulfilled, (s, a) => { s.testLoading = false; s.testResult = a.payload; })

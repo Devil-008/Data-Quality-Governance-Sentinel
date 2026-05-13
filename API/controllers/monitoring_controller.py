@@ -4,6 +4,7 @@ This is where the real engine lives. Everything is driven by actual connector
 queries; no hardcoded datasets. Results are persisted into datasets,
 dataset_columns, schema_history, monitoring_runs and alerts.
 """
+
 import json
 import datetime
 from typing import Dict, Any, List, Optional, Tuple
@@ -16,8 +17,11 @@ from pydantic import BaseModel
 from database.db_connection import fetch_all, fetch_one, execute, db_cursor
 from middleware.auth_middleware import get_current_user, require_roles
 from utils.common import (
-    logger, decrypt_config, detect_pii_in_column_name,
-    detect_pii_in_samples, safe_json_dumps,
+    logger,
+    decrypt_config,
+    detect_pii_in_column_name,
+    detect_pii_in_samples,
+    safe_json_dumps,
 )
 from utils.constants import QUALITY_CHECKS
 from utils.ai_helper import analyze_issue, validate_dataset_quality
@@ -27,7 +31,9 @@ from controllers.connector_controller import test_connection
 
 router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
 
+
 def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
+    logger.info("Starting Azure ADF scan for connector: %s", conn_row.get("name"))
 
     cfg = decrypt_config(conn_row["config_json"])
 
@@ -37,6 +43,7 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
 
     discovered = []
 
+    logger.debug("Getting Azure token for tenant: %s", tenant)
     token_r = requests.post(
         f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
         data={
@@ -49,7 +56,8 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
     )
 
     if token_r.status_code != 200:
-        raise RuntimeError(token_r.text)
+        logger.error("Failed to get Azure token: %s", token_r.text[:200])
+        raise RuntimeError(f"Azure auth failed: {token_r.status_code}")
 
     tok = token_r.json()["access_token"]
 
@@ -59,11 +67,10 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
         f"/providers/Microsoft.DataFactory/factories/{cfg['factory_name']}"
     )
 
-    headers = {
-        "Authorization": f"Bearer {tok}"
-    }
+    headers = {"Authorization": f"Bearer {tok}"}
 
     # DATASETS
+    logger.debug("Fetching datasets from: %s", f"{base}/datasets")
     ds_r = requests.get(
         f"{base}/datasets?api-version=2018-06-01",
         headers=headers,
@@ -71,19 +78,26 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
     )
 
     if ds_r.status_code == 200:
-        for ds in ds_r.json().get("value", []):
-
+        datasets = ds_r.json().get("value", [])
+        logger.info("Found %d datasets in ADF", len(datasets))
+        for ds in datasets:
             props = ds.get("properties", {})
-
-            discovered.append({
-                "schema": "adf",
-                "name": ds.get("name"),
-                "type": "dataset",
-                "row_count": None,
-                "columns": [],
-            })
+            discovered.append(
+                {
+                    "schema": "adf",
+                    "name": ds.get("name"),
+                    "type": "dataset",
+                    "row_count": None,
+                    "columns": [],
+                }
+            )
+    else:
+        logger.warning(
+            "Failed to fetch ADF datasets: %s %s", ds_r.status_code, ds_r.text[:200]
+        )
 
     # PIPELINES
+    logger.debug("Fetching pipelines from: %s", f"{base}/pipelines")
     pl_r = requests.get(
         f"{base}/pipelines?api-version=2018-06-01",
         headers=headers,
@@ -91,17 +105,27 @@ def _scan_azure_adf(conn_row: dict) -> Dict[str, Any]:
     )
 
     if pl_r.status_code == 200:
-        for p in pl_r.json().get("value", []):
+        pipelines = pl_r.json().get("value", [])
+        logger.info("Found %d pipelines in ADF", len(pipelines))
+        for p in pipelines:
+            discovered.append(
+                {
+                    "schema": "adf",
+                    "name": p.get("name"),
+                    "type": "pipeline",
+                    "row_count": None,
+                    "columns": [],
+                }
+            )
+    else:
+        logger.warning(
+            "Failed to fetch ADF pipelines: %s %s", pl_r.status_code, pl_r.text[:200]
+        )
 
-            discovered.append({
-                "schema": "adf",
-                "name": p.get("name"),
-                "type": "pipeline",
-                "row_count": None,
-                "columns": [],
-            })
-
+    logger.info("Azure ADF scan complete: discovered %d items", len(discovered))
     return {"datasets": discovered}
+
+
 # ---------- low-level source readers --------------------------------------
 def _mysql_conn(cfg: Dict[str, Any]):
     return pymysql.connect(
@@ -151,20 +175,22 @@ def _scan_mysql(conn_row: dict) -> Dict[str, Any]:
                         (schema, tname),
                     )
                     cols = cur.fetchall()
-                    discovered.append({
-                        "schema": schema,
-                        "name": tname,
-                        "type": ttype,
-                        "row_count": row_count,
-                        "columns": [
-                            {
-                                "name": c["COLUMN_NAME"],
-                                "type": c["DATA_TYPE"],
-                                "nullable": c["IS_NULLABLE"] == "YES",
-                            }
-                            for c in cols
-                        ],
-                    })
+                    discovered.append(
+                        {
+                            "schema": schema,
+                            "name": tname,
+                            "type": ttype,
+                            "row_count": row_count,
+                            "columns": [
+                                {
+                                    "name": c["COLUMN_NAME"],
+                                    "type": c["DATA_TYPE"],
+                                    "nullable": c["IS_NULLABLE"] == "YES",
+                                }
+                                for c in cols
+                            ],
+                        }
+                    )
         finally:
             cn.close()
         logger.info("MySQL scan complete, discovered %d datasets", len(discovered))
@@ -181,57 +207,144 @@ def _scan_github(conn_row: dict) -> Dict[str, Any]:
         path = repo.split("github.com/", 1)[-1]
     else:
         path = repo
-    headers = {"Authorization": f"Bearer {cfg.get('token')}", "Accept": "application/vnd.github+json"}
+    headers = {
+        "Authorization": f"Bearer {cfg.get('token')}",
+        "Accept": "application/vnd.github+json",
+    }
     discovered = []
     # workflows
     try:
-        r = requests.get(f"https://api.github.com/repos/{path}/actions/workflows", headers=headers, timeout=15)
+        r = requests.get(
+            f"https://api.github.com/repos/{path}/actions/workflows",
+            headers=headers,
+            timeout=15,
+        )
         if r.status_code == 200:
             for wf in r.json().get("workflows", []):
-                discovered.append({
-                    "schema": "actions",
-                    "name": wf.get("name") or wf.get("path"),
-                    "type": "workflow",
-                    "row_count": None,
-                    "columns": [],
-                })
+                discovered.append(
+                    {
+                        "schema": "actions",
+                        "name": wf.get("name") or wf.get("path"),
+                        "type": "workflow",
+                        "row_count": None,
+                        "columns": [],
+                    }
+                )
     except Exception as e:
         logger.warning("GitHub workflows fetch failed: %s", e)
     return {"datasets": discovered}
 
 
 def _scan_databricks(conn_row: dict) -> Dict[str, Any]:
+    """Scan Databricks: jobs, clusters, and Unity Catalog tables."""
     cfg = decrypt_config(conn_row["config_json"])
     base = cfg.get("workspace_url", "").rstrip("/")
-    headers = {"Authorization": f"Bearer {cfg.get('token')}"}
+    token = cfg.get("token")
+    headers = {"Authorization": f"Bearer {token}"}
     discovered = []
+
+    # ===== Jobs =====
     try:
         r = requests.get(f"{base}/api/2.0/jobs/list", headers=headers, timeout=15)
         if r.status_code == 200:
             for j in r.json().get("jobs", []):
                 settings = j.get("settings") or {}
-                discovered.append({
-                    "schema": "jobs",
-                    "name": settings.get("name") or f"job_{j.get('job_id')}",
-                    "type": "job",
-                    "row_count": None,
-                    "columns": [],
-                })
+                discovered.append(
+                    {
+                        "schema": "jobs",
+                        "name": settings.get("name") or f"job_{j.get('job_id')}",
+                        "type": "job",
+                        "row_count": None,
+                        "columns": [],
+                    }
+                )
     except Exception as e:
         logger.warning("Databricks jobs failed: %s", e)
+
+    # ===== Clusters =====
     try:
         r = requests.get(f"{base}/api/2.0/clusters/list", headers=headers, timeout=15)
         if r.status_code == 200:
             for cl in r.json().get("clusters", []):
-                discovered.append({
-                    "schema": "clusters",
-                    "name": cl.get("cluster_name") or cl.get("cluster_id"),
-                    "type": "cluster",
-                    "row_count": None,
-                    "columns": [],
-                })
+                discovered.append(
+                    {
+                        "schema": "clusters",
+                        "name": cl.get("cluster_name") or cl.get("cluster_id"),
+                        "type": "cluster",
+                        "row_count": None,
+                        "columns": [],
+                    }
+                )
     except Exception as e:
         logger.warning("Databricks clusters failed: %s", e)
+
+    # ===== Unity Catalog Tables =====
+    try:
+        # List all schemas in default catalog
+        schemas_r = requests.get(
+            f"{base}/api/2.1/unity-catalog/schemas?catalog_name=hive_metastore",
+            headers=headers,
+            timeout=15,
+        )
+        if schemas_r.status_code == 200:
+            for schema in schemas_r.json().get("objects", []):
+                schema_name = schema.get("name")
+                try:
+                    # List tables in this schema
+                    tables_r = requests.get(
+                        f"{base}/api/2.1/unity-catalog/tables?catalog_name=hive_metastore&schema_name={schema_name}",
+                        headers=headers,
+                        timeout=15,
+                    )
+                    if tables_r.status_code == 200:
+                        for tbl in tables_r.json().get("objects", []):
+                            tbl_name = tbl.get("name")
+                            columns = []
+                            row_count = None
+
+                            # Get table columns
+                            try:
+                                col_r = requests.get(
+                                    f"{base}/api/2.1/unity-catalog/tables/hive_metastore.{schema_name}.{tbl_name}",
+                                    headers=headers,
+                                    timeout=15,
+                                )
+                                if col_r.status_code == 200:
+                                    tbl_obj = col_r.json()
+                                    cols_info = tbl_obj.get("columns", [])
+                                    columns = [
+                                        {
+                                            "name": c.get("name"),
+                                            "type": c.get("type_text", "unknown"),
+                                        }
+                                        for c in cols_info
+                                    ]
+                            except Exception as col_e:
+                                logger.debug(
+                                    "Failed to get columns for %s.%s: %s",
+                                    schema_name,
+                                    tbl_name,
+                                    col_e,
+                                )
+
+                            discovered.append(
+                                {
+                                    "schema": schema_name,
+                                    "name": tbl_name,
+                                    "type": "table",
+                                    "row_count": row_count,  # Will be estimated by quality checks
+                                    "columns": columns,
+                                }
+                            )
+                except Exception as tbl_e:
+                    logger.debug(
+                        "Failed to list tables in schema %s: %s", schema_name, tbl_e
+                    )
+        else:
+            logger.debug("Databricks schemas list returned %d", schemas_r.status_code)
+    except Exception as e:
+        logger.debug("Databricks Unity Catalog scan skipped: %s", e)
+
     return {"datasets": discovered}
 
 
@@ -246,9 +359,12 @@ def _scan_azure(conn_row: dict) -> Dict[str, Any]:
         token_r = requests.post(
             f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
             data={
-                "grant_type": "client_credentials", "client_id": cid,
-                "client_secret": secret, "scope": "https://management.azure.com/.default",
-            }, timeout=15,
+                "grant_type": "client_credentials",
+                "client_id": cid,
+                "client_secret": secret,
+                "scope": "https://management.azure.com/.default",
+            },
+            timeout=15,
         )
         if token_r.status_code != 200:
             raise RuntimeError(f"Token: {token_r.text[:200]}")
@@ -256,17 +372,20 @@ def _scan_azure(conn_row: dict) -> Dict[str, Any]:
         # list resource groups
         rg = requests.get(
             f"https://management.azure.com/subscriptions/{sub}/resourcegroups?api-version=2021-04-01",
-            headers={"Authorization": f"Bearer {tok}"}, timeout=15,
+            headers={"Authorization": f"Bearer {tok}"},
+            timeout=15,
         )
         if rg.status_code == 200:
             for g in rg.json().get("value", []):
-                discovered.append({
-                    "schema": g.get("location", ""),
-                    "name": g.get("name"),
-                    "type": "blob",  # we group cloud resources as 'blob' container
-                    "row_count": None,
-                    "columns": [],
-                })
+                discovered.append(
+                    {
+                        "schema": g.get("location", ""),
+                        "name": g.get("name"),
+                        "type": "blob",  # we group cloud resources as 'blob' container
+                        "row_count": None,
+                        "columns": [],
+                    }
+                )
     except Exception as e:
         logger.warning("Azure scan failed: %s", e)
     return {"datasets": discovered}
@@ -280,7 +399,7 @@ def _upsert_dataset(connector_id: int, ds: dict) -> int:
             (connector_id, ds.get("schema") or "", ds.get("name")),
         )
         cols = ds.get("columns") or []
-        
+
         # Map to valid dataset type
         raw_type = ds.get("type", "table")
         type_mapping = {
@@ -297,20 +416,32 @@ def _upsert_dataset(connector_id: int, ds: dict) -> int:
             "notebook": "notebook",
         }
         valid_type = type_mapping.get(raw_type, "table")
-        
+
         if existing:
             execute(
                 "UPDATE datasets SET dataset_type=%s, row_count=%s, column_count=%s, "
                 "last_profiled_at=%s WHERE id=%s",
-                (valid_type, ds.get("row_count"), len(cols),
-                 datetime.datetime.utcnow(), existing["id"]),
+                (
+                    valid_type,
+                    ds.get("row_count"),
+                    len(cols),
+                    datetime.datetime.utcnow(),
+                    existing["id"],
+                ),
             )
             return existing["id"]
         return execute(
             "INSERT INTO datasets (connector_id, schema_name, dataset_name, dataset_type, "
             "row_count, column_count, last_profiled_at) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (connector_id, ds.get("schema"), ds.get("name"), valid_type,
-             ds.get("row_count"), len(cols), datetime.datetime.utcnow()),
+            (
+                connector_id,
+                ds.get("schema"),
+                ds.get("name"),
+                valid_type,
+                ds.get("row_count"),
+                len(cols),
+                datetime.datetime.utcnow(),
+            ),
         )
     except Exception as e:
         logger.exception("Failed to upsert dataset: %s", ds.get("name"))
@@ -330,8 +461,14 @@ def _refresh_columns(dataset_id: int, cols: List[dict]) -> List[dict]:
             execute(
                 "INSERT INTO dataset_columns (dataset_id, column_name, data_type, is_nullable, "
                 "is_pii, pii_category) VALUES (%s, %s, %s, %s, %s, %s)",
-                (dataset_id, c["name"], c.get("type"), 1 if c.get("nullable") else 0,
-                 is_pii, cat or None),
+                (
+                    dataset_id,
+                    c["name"],
+                    c.get("type"),
+                    1 if c.get("nullable") else 0,
+                    is_pii,
+                    cat or None,
+                ),
             )
         if pii_categories:
             cats = ",".join(sorted(set(pii_categories)))
@@ -347,16 +484,24 @@ def _refresh_columns(dataset_id: int, cols: List[dict]) -> List[dict]:
 
 def _capture_schema_history(dataset_id: int, cols: List[dict]):
     try:
-        snap = json.dumps([
-            {"name": c["name"], "type": c.get("type"), "nullable": c.get("nullable")}
-            for c in cols
-        ])
+        snap = json.dumps(
+            [
+                {
+                    "name": c["name"],
+                    "type": c.get("type"),
+                    "nullable": c.get("nullable"),
+                }
+                for c in cols
+            ]
+        )
         execute(
             "INSERT INTO schema_history (dataset_id, snapshot_json) VALUES (%s, %s)",
             (dataset_id, snap),
         )
     except Exception as e:
-        logger.warning("Failed to capture schema history for dataset %s: %s", dataset_id, e)
+        logger.warning(
+            "Failed to capture schema history for dataset %s: %s", dataset_id, e
+        )
 
 
 def _detect_schema_drift(dataset_id: int) -> Optional[Dict[str, Any]]:
@@ -376,23 +521,32 @@ def _detect_schema_drift(dataset_id: int) -> Optional[Dict[str, Any]]:
         removed = [n for n in old_map if n not in new_map]
         changed = []
         for name in new_map:
-            if name in old_map and new_map[name].get("type") != old_map[name].get("type"):
-                changed.append({
-                    "name": name,
-                    "old_type": old_map[name].get("type"),
-                    "new_type": new_map[name].get("type"),
-                })
+            if name in old_map and new_map[name].get("type") != old_map[name].get(
+                "type"
+            ):
+                changed.append(
+                    {
+                        "name": name,
+                        "old_type": old_map[name].get("type"),
+                        "new_type": new_map[name].get("type"),
+                    }
+                )
         if added or removed or changed:
             return {"added": added, "removed": removed, "type_changes": changed}
         return None
     except Exception as e:
-        logger.warning("Failed to detect schema drift for dataset %s: %s", dataset_id, e)
+        logger.warning(
+            "Failed to detect schema drift for dataset %s: %s", dataset_id, e
+        )
         return None
 
 
 def _execute_validation_rules(dataset_id: int, connector_cfg: dict) -> List[dict]:
     try:
-        ds = fetch_one("SELECT d.*, c.type AS connector_type FROM datasets d JOIN connectors c ON d.connector_id=c.id WHERE d.id=%s", (dataset_id,))
+        ds = fetch_one(
+            "SELECT d.*, c.type AS connector_type FROM datasets d JOIN connectors c ON d.connector_id=c.id WHERE d.id=%s",
+            (dataset_id,),
+        )
         dataset_rules = []
         try:
             dataset_rules = fetch_all(
@@ -401,7 +555,7 @@ def _execute_validation_rules(dataset_id: int, connector_cfg: dict) -> List[dict
             )
         except Exception as e:
             logger.warning("dataset_validation_rules table not found or error: %s", e)
-        
+
         type_based_rules = []
         if ds:
             try:
@@ -411,15 +565,17 @@ def _execute_validation_rules(dataset_id: int, connector_cfg: dict) -> List[dict
                     (ds.get("connector_type"), ds.get("dataset_type")),
                 )
             except Exception as e:
-                logger.warning("rule_books or dataset_validation_rules join failed: %s", e)
-        
+                logger.warning(
+                    "rule_books or dataset_validation_rules join failed: %s", e
+                )
+
         all_rules = dataset_rules + type_based_rules
         results = []
         if not ds or (not all_rules) or ds["connector_type"] != "mysql":
             return results
-        
+
         cfg = decrypt_config(connector_cfg)
-        
+
         try:
             cn = _mysql_conn(cfg)
             try:
@@ -427,14 +583,20 @@ def _execute_validation_rules(dataset_id: int, connector_cfg: dict) -> List[dict
                     schema = ds["schema_name"] or cfg.get("database")
                     name = ds["dataset_name"]
                     for rule in all_rules:
-                        rule_config = json.loads(rule["rule_config"]) if rule["rule_config"] else {}
+                        rule_config = (
+                            json.loads(rule["rule_config"])
+                            if rule["rule_config"]
+                            else {}
+                        )
                         passed = True
                         result_msg = ""
-                        
+
                         if rule["rule_type"] == "null_check":
                             col = rule_config.get("column")
                             if col:
-                                cur.execute(f"SELECT COUNT(*) AS c FROM `{schema}`.`{name}` WHERE `{col}` IS NULL")
+                                cur.execute(
+                                    f"SELECT COUNT(*) AS c FROM `{schema}`.`{name}` WHERE `{col}` IS NULL"
+                                )
                                 null_count = (cur.fetchone() or {}).get("c", 0)
                                 if null_count > (rule_config.get("max_nulls") or 0):
                                     passed = False
@@ -442,12 +604,18 @@ def _execute_validation_rules(dataset_id: int, connector_cfg: dict) -> List[dict
                         elif rule["rule_type"] == "unique_check":
                             col = rule_config.get("column")
                             if col:
-                                cur.execute(f"SELECT COUNT(*) AS total, COUNT(DISTINCT `{col}`) AS unique FROM `{schema}`.`{name}`")
+                                cur.execute(
+                                    f"SELECT COUNT(*) AS total, COUNT(DISTINCT `{col}`) AS unique FROM `{schema}`.`{name}`"
+                                )
                                 row = cur.fetchone() or {}
-                                total, unique = row.get("total", 0), row.get("unique", 0)
+                                total, unique = row.get("total", 0), row.get(
+                                    "unique", 0
+                                )
                                 if total > 0 and unique < total:
                                     passed = False
-                                    result_msg = f"Column {col} has {total - unique} duplicates"
+                                    result_msg = (
+                                        f"Column {col} has {total - unique} duplicates"
+                                    )
                         elif rule["rule_type"] == "range_check":
                             col = rule_config.get("column")
                             min_val = rule_config.get("min")
@@ -459,7 +627,9 @@ def _execute_validation_rules(dataset_id: int, connector_cfg: dict) -> List[dict
                                 if max_val is not None:
                                     conditions.append(f"`{col}` > {max_val}")
                                 if conditions:
-                                    cur.execute(f"SELECT COUNT(*) AS c FROM `{schema}`.`{name}` WHERE {' OR '.join(conditions)}")
+                                    cur.execute(
+                                        f"SELECT COUNT(*) AS c FROM `{schema}`.`{name}` WHERE {' OR '.join(conditions)}"
+                                    )
                                     invalid_count = (cur.fetchone() or {}).get("c", 0)
                                     if invalid_count > 0:
                                         passed = False
@@ -468,7 +638,9 @@ def _execute_validation_rules(dataset_id: int, connector_cfg: dict) -> List[dict
                             col = rule_config.get("column")
                             pattern = rule_config.get("pattern")
                             if col and pattern:
-                                cur.execute(f"SELECT COUNT(*) AS c FROM `{schema}`.`{name}` WHERE `{col}` NOT REGEXP '{pattern}'")
+                                cur.execute(
+                                    f"SELECT COUNT(*) AS c FROM `{schema}`.`{name}` WHERE `{col}` NOT REGEXP '{pattern}'"
+                                )
                                 invalid_count = (cur.fetchone() or {}).get("c", 0)
                                 if invalid_count > 0:
                                     passed = False
@@ -485,19 +657,23 @@ def _execute_validation_rules(dataset_id: int, connector_cfg: dict) -> List[dict
                                 except Exception as e:
                                     passed = False
                                     result_msg = f"Custom SQL error: {str(e)}"
-                        
-                        results.append({
-                            "rule_id": rule["id"],
-                            "rule_name": rule["rule_name"],
-                            "rule_type": rule["rule_type"],
-                            "passed": passed,
-                            "message": result_msg,
-                        })
+
+                        results.append(
+                            {
+                                "rule_id": rule["id"],
+                                "rule_name": rule["rule_name"],
+                                "rule_type": rule["rule_type"],
+                                "passed": passed,
+                                "message": result_msg,
+                            }
+                        )
             finally:
                 cn.close()
         except Exception as e:
-            logger.error("Validation rules execution failed for dataset %s: %s", dataset_id, e)
-        
+            logger.error(
+                "Validation rules execution failed for dataset %s: %s", dataset_id, e
+            )
+
         return results
     except Exception as e:
         logger.error("_execute_validation_rules top-level error: %s", e)
@@ -524,9 +700,15 @@ def _log_monitoring_event(
         logger.warning("monitoring_logs table not found or logging failed: %s", e)
 
 
-def _create_alert(category: str, severity: str, title: str, message: str,
-                  connector_id: Optional[int] = None, dataset_id: Optional[int] = None,
-                  ai_payload: Optional[dict] = None) -> int:
+def _create_alert(
+    category: str,
+    severity: str,
+    title: str,
+    message: str,
+    connector_id: Optional[int] = None,
+    dataset_id: Optional[int] = None,
+    ai_payload: Optional[dict] = None,
+) -> int:
     ai = {}
     try:
         if ai_payload is not None:
@@ -537,8 +719,18 @@ def _create_alert(category: str, severity: str, title: str, message: str,
         "INSERT INTO alerts (connector_id, dataset_id, category, severity, title, message, "
         "ai_summary, ai_root_cause, ai_impact, ai_recommendation) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-        (connector_id, dataset_id, category, severity, title, message,
-         ai.get("summary"), ai.get("root_cause"), ai.get("impact"), ai.get("recommendation")),
+        (
+            connector_id,
+            dataset_id,
+            category,
+            severity,
+            title,
+            message,
+            ai.get("summary"),
+            ai.get("root_cause"),
+            ai.get("impact"),
+            ai.get("recommendation"),
+        ),
     )
     # in-app notifications (broadcast to all active users)
     users = fetch_all("SELECT id FROM users WHERE is_active=1")
@@ -551,20 +743,29 @@ def _create_alert(category: str, severity: str, title: str, message: str,
     recipients = _alert_recipients()
     if recipients:
         try:
-            send_alert_email(recipients, {
-                "category": category, "severity": severity,
-                "title": title, "message": message,
-                "ai_summary": ai.get("summary"), "ai_root_cause": ai.get("root_cause"),
-                "ai_impact": ai.get("impact"), "ai_recommendation": ai.get("recommendation"),
-                "created_at": datetime.datetime.utcnow().isoformat(),
-            })
+            send_alert_email(
+                recipients,
+                {
+                    "category": category,
+                    "severity": severity,
+                    "title": title,
+                    "message": message,
+                    "ai_summary": ai.get("summary"),
+                    "ai_root_cause": ai.get("root_cause"),
+                    "ai_impact": ai.get("impact"),
+                    "ai_recommendation": ai.get("recommendation"),
+                    "created_at": datetime.datetime.utcnow().isoformat(),
+                },
+            )
         except Exception as e:
             logger.warning("Alert email failed: %s", e)
     return aid
 
 
 def _alert_recipients() -> List[str]:
-    row = fetch_one("SELECT setting_value FROM app_settings WHERE setting_key='alert_email_recipients'")
+    row = fetch_one(
+        "SELECT setting_value FROM app_settings WHERE setting_key='alert_email_recipients'"
+    )
     raw = (row or {}).get("setting_value", "") or ""
     return [x.strip() for x in raw.split(",") if x.strip()]
 
@@ -586,8 +787,10 @@ def _run_ai_quality_checks(
             "column_count": ds_info["column_count"],
             "connector_type": ds_info["connector_type"],
         }
-        
-        columns = fetch_all("SELECT * FROM dataset_columns WHERE dataset_id=%s", (dataset_id,))
+
+        columns = fetch_all(
+            "SELECT * FROM dataset_columns WHERE dataset_id=%s", (dataset_id,)
+        )
         schema = [
             {
                 "name": c["column_name"],
@@ -598,23 +801,21 @@ def _run_ai_quality_checks(
             }
             for c in columns
         ]
-        
+
         search_query = f"Data quality checks for {ds_info['connector_type']} {ds_info['dataset_type']} {ds_info['dataset_name']}"
         rule_results = search_rule_books(
-            search_query,
-            top_k=10,
-            connector_type=ds_info["connector_type"]
+            search_query, top_k=10, connector_type=ds_info["connector_type"]
         )
-        
+
         rule_chunks = [r["document"] for r in rule_results if r.get("document")]
-        
+
         ai_result = validate_dataset_quality(
             dataset_metadata=dataset_metadata,
             schema=schema,
             sample_rows=sample_rows,
             rule_chunks=rule_chunks,
         )
-        
+
         return (
             ai_result["issues"],
             ai_result["quality_score"],
@@ -628,19 +829,21 @@ def _run_ai_quality_checks(
 
 
 # ---------- comprehensive quality checks ----------------------------------
-def _run_mysql_quality_checks(dataset_id: int, cfg: dict, ds: dict) -> Tuple[List[dict], float, dict]:
+def _run_mysql_quality_checks(
+    dataset_id: int, cfg: dict, ds: dict
+) -> Tuple[List[dict], float, dict]:
     """Run all 16 MySQL quality checks on a dataset."""
     issues = []
     score = 100.0
     metrics = {}
-    
+
     try:
         cn = _mysql_conn(cfg)
         try:
             with cn.cursor() as cur:
                 schema = ds["schema_name"] or cfg.get("database")
                 name = ds["dataset_name"]
-                
+
                 # 1. Row count validation
                 cur.execute(f"SELECT COUNT(*) AS c FROM `{schema}`.`{name}`")
                 total_rows = (cur.fetchone() or {}).get("c", 0)
@@ -648,7 +851,7 @@ def _run_mysql_quality_checks(dataset_id: int, cfg: dict, ds: dict) -> Tuple[Lis
                 if total_rows == 0:
                     issues.append("Row count validation: Empty table")
                     score -= 20
-                
+
                 # Get columns info
                 cur.execute(
                     "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY "
@@ -658,45 +861,61 @@ def _run_mysql_quality_checks(dataset_id: int, cfg: dict, ds: dict) -> Tuple[Lis
                 )
                 columns = cur.fetchall()
                 metrics["columns"] = []
-                
+
                 for col in columns:
                     col_name = col["COLUMN_NAME"]
                     col_metrics = {"column": col_name}
-                    
+
                     # 2. Null value check
                     try:
-                        cur.execute(f"SELECT SUM(CASE WHEN `{col_name}` IS NULL THEN 1 ELSE 0 END) AS n FROM `{schema}`.`{name}`")
+                        cur.execute(
+                            f"SELECT SUM(CASE WHEN `{col_name}` IS NULL THEN 1 ELSE 0 END) AS n FROM `{schema}`.`{name}`"
+                        )
                         null_count = (cur.fetchone() or {}).get("n", 0)
                         null_pct = (null_count / total_rows * 100) if total_rows else 0
                         col_metrics["null_pct"] = round(null_pct, 2)
                         if null_pct > 30:
-                            issues.append(f"Null value check: Column '{col_name}' has {round(null_pct,1)}% NULLs")
+                            issues.append(
+                                f"Null value check: Column '{col_name}' has {round(null_pct,1)}% NULLs"
+                            )
                             score -= 5
                     except Exception:
                         pass
-                    
+
                     # 3. Duplicate record check (for each column)
                     try:
-                        cur.execute(f"SELECT COUNT(*) AS total, COUNT(DISTINCT `{col_name}`) AS unique FROM `{schema}`.`{name}`")
+                        cur.execute(
+                            f"SELECT COUNT(*) AS total, COUNT(DISTINCT `{col_name}`) AS unique FROM `{schema}`.`{name}`"
+                        )
                         row = cur.fetchone() or {}
                         total, unique = row.get("total", 0), row.get("unique", 0)
                         col_metrics["distinct_count"] = unique
                         if total > 0 and unique < total:
-                            issues.append(f"Duplicate record check: Column '{col_name}' has {total - unique} duplicates")
+                            issues.append(
+                                f"Duplicate record check: Column '{col_name}' has {total - unique} duplicates"
+                            )
                             score -= 3
                     except Exception:
                         pass
-                    
+
                     # 4. Numeric range validation
-                    if col["DATA_TYPE"] in ["int", "bigint", "decimal", "float", "double"]:
+                    if col["DATA_TYPE"] in [
+                        "int",
+                        "bigint",
+                        "decimal",
+                        "float",
+                        "double",
+                    ]:
                         try:
-                            cur.execute(f"SELECT MIN(`{col_name}`) AS min_val, MAX(`{col_name}`) AS max_val FROM `{schema}`.`{name}`")
+                            cur.execute(
+                                f"SELECT MIN(`{col_name}`) AS min_val, MAX(`{col_name}`) AS max_val FROM `{schema}`.`{name}`"
+                            )
                             range_row = cur.fetchone() or {}
                             col_metrics["min"] = range_row.get("min_val")
                             col_metrics["max"] = range_row.get("max_val")
                         except Exception:
                             pass
-                    
+
                     # 5. Invalid date/time check
                     if col["DATA_TYPE"] in ["date", "datetime", "timestamp"]:
                         try:
@@ -706,33 +925,44 @@ def _run_mysql_quality_checks(dataset_id: int, cfg: dict, ds: dict) -> Tuple[Lis
                             )
                             invalid = (cur.fetchone() or {}).get("invalid", 0)
                             if invalid > 0:
-                                issues.append(f"Invalid date/time check: Column '{col_name}' has {invalid} invalid dates")
+                                issues.append(
+                                    f"Invalid date/time check: Column '{col_name}' has {invalid} invalid dates"
+                                )
                                 score -= 4
                         except Exception:
                             pass
-                    
+
                     metrics["columns"].append(col_metrics)
-                
+
                 # 6. Primary key uniqueness
-                pk_cols = [c["COLUMN_NAME"] for c in columns if c["COLUMN_KEY"] == "PRI"]
+                pk_cols = [
+                    c["COLUMN_NAME"] for c in columns if c["COLUMN_KEY"] == "PRI"
+                ]
                 if pk_cols:
                     try:
                         pk_expr = ", ".join([f"`{c}`" for c in pk_cols])
-                        cur.execute(f"SELECT COUNT(*) - COUNT(DISTINCT {pk_expr}) AS duplicates FROM `{schema}`.`{name}`")
+                        cur.execute(
+                            f"SELECT COUNT(*) - COUNT(DISTINCT {pk_expr}) AS duplicates FROM `{schema}`.`{name}`"
+                        )
                         pk_duplicates = (cur.fetchone() or {}).get("duplicates", 0)
                         if pk_duplicates > 0:
-                            issues.append(f"Primary key uniqueness: {pk_duplicates} duplicate primary keys found")
+                            issues.append(
+                                f"Primary key uniqueness: {pk_duplicates} duplicate primary keys found"
+                            )
                             score -= 10
                     except Exception:
                         pass
-                
+
                 # 7. Foreign key integrity
                 try:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
                         FROM information_schema.KEY_COLUMN_USAGE
                         WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND REFERENCED_TABLE_NAME IS NOT NULL
-                    """, (schema, name))
+                    """,
+                        (schema, name),
+                    )
                     fks = cur.fetchall()
                     for fk in fks:
                         try:
@@ -746,16 +976,18 @@ def _run_mysql_quality_checks(dataset_id: int, cfg: dict, ds: dict) -> Tuple[Lis
                             """)
                             orphaned = (cur.fetchone() or {}).get("orphaned", 0)
                             if orphaned > 0:
-                                issues.append(f"Foreign key integrity: {orphaned} orphaned records in FK '{fk['CONSTRAINT_NAME']}'")
+                                issues.append(
+                                    f"Foreign key integrity: {orphaned} orphaned records in FK '{fk['CONSTRAINT_NAME']}'"
+                                )
                                 score -= 8
                         except Exception:
                             pass
                 except Exception:
                     pass
-                
+
                 # 8. Data type validation (basic)
                 # Already covered by column metadata
-                
+
                 # 9. Truncation check (for string columns)
                 for col in columns:
                     if col["DATA_TYPE"] in ["varchar", "char", "text"]:
@@ -768,30 +1000,48 @@ def _run_mysql_quality_checks(dataset_id: int, cfg: dict, ds: dict) -> Tuple[Lis
                             """)
                             truncated = (cur.fetchone() or {}).get("truncated", 0)
                             if truncated > 0:
-                                issues.append(f"Truncation check: Column '{col_name}' has {truncated} potentially truncated values")
+                                issues.append(
+                                    f"Truncation check: Column '{col_name}' has {truncated} potentially truncated values"
+                                )
                                 score -= 3
                         except Exception:
                             pass
-                
+
                 # 10. Data freshness check (if there's a timestamp column)
-                timestamp_cols = [c["COLUMN_NAME"] for c in columns if c["DATA_TYPE"] in ["datetime", "timestamp"]]
+                timestamp_cols = [
+                    c["COLUMN_NAME"]
+                    for c in columns
+                    if c["DATA_TYPE"] in ["datetime", "timestamp"]
+                ]
                 if timestamp_cols:
                     try:
                         fresh_col = timestamp_cols[0]
-                        cur.execute(f"SELECT MAX(`{fresh_col}`) AS last_update FROM `{schema}`.`{name}`")
+                        cur.execute(
+                            f"SELECT MAX(`{fresh_col}`) AS last_update FROM `{schema}`.`{name}`"
+                        )
                         last_update = (cur.fetchone() or {}).get("last_update")
                         if last_update:
-                            metrics["last_update"] = last_update.isoformat() if last_update else None
+                            metrics["last_update"] = (
+                                last_update.isoformat() if last_update else None
+                            )
                             days_old = (datetime.datetime.utcnow() - last_update).days
                             if days_old > 7:
-                                issues.append(f"Data freshness check: Data is {days_old} days old")
+                                issues.append(
+                                    f"Data freshness check: Data is {days_old} days old"
+                                )
                                 score -= 5
                     except Exception:
                         pass
-                
+
                 # 11. Outlier detection (simple IQR method for numeric columns)
                 for col in columns:
-                    if col["DATA_TYPE"] in ["int", "bigint", "decimal", "float", "double"]:
+                    if col["DATA_TYPE"] in [
+                        "int",
+                        "bigint",
+                        "decimal",
+                        "float",
+                        "double",
+                    ]:
                         try:
                             col_name = col["COLUMN_NAME"]
                             cur.execute(f"""
@@ -799,51 +1049,64 @@ def _run_mysql_quality_checks(dataset_id: int, cfg: dict, ds: dict) -> Tuple[Lis
                                 WHERE `{col_name}` IS NOT NULL
                                 ORDER BY `{col_name}`
                             """)
-                            values = [r[col_name] for r in cur.fetchall() if r[col_name] is not None]
+                            values = [
+                                r[col_name]
+                                for r in cur.fetchall()
+                                if r[col_name] is not None
+                            ]
                             if len(values) > 10:
                                 import statistics
+
                                 q1 = statistics.quantiles(values, n=4)[0]
                                 q3 = statistics.quantiles(values, n=4)[2]
                                 iqr = q3 - q1
                                 lower_bound = q1 - 1.5 * iqr
                                 upper_bound = q3 + 1.5 * iqr
-                                outliers = [v for v in values if v < lower_bound or v > upper_bound]
+                                outliers = [
+                                    v
+                                    for v in values
+                                    if v < lower_bound or v > upper_bound
+                                ]
                                 if len(outliers) > 0:
-                                    issues.append(f"Outlier/anomaly detection: Column '{col_name}' has {len(outliers)} outliers")
+                                    issues.append(
+                                        f"Outlier/anomaly detection: Column '{col_name}' has {len(outliers)} outliers"
+                                    )
                                     score -= 3
                         except Exception:
                             pass
-                
+
                 # 12. Schema drift detection is handled separately
-                
+
                 # 13. PII detection is handled separately
-                
+
                 # 14. Missing mandatory columns - would require configuration
-                
+
                 # 15. Referential integrity check covered in FK check
-                
+
         finally:
             cn.close()
     except Exception as e:
         logger.error("MySQL quality checks failed: %s", e)
         issues.append(f"Quality check error: {str(e)}")
         score -= 20
-    
+
     score = max(0.0, min(100.0, score))
     return issues, score, metrics
 
 
-def _run_adf_quality_checks(connector_id: int, cfg: dict) -> Tuple[List[dict], float, dict]:
+def _run_adf_quality_checks(
+    connector_id: int, cfg: dict
+) -> Tuple[List[dict], float, dict]:
     """Run all 15 ADF quality checks."""
     issues = []
     score = 100.0
     metrics = {}
-    
+
     try:
         tenant = cfg.get("tenant_id")
         cid = cfg.get("client_id")
         secret = cfg.get("client_secret")
-        
+
         token_r = requests.post(
             f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
             data={
@@ -854,12 +1117,12 @@ def _run_adf_quality_checks(connector_id: int, cfg: dict) -> Tuple[List[dict], f
             },
             timeout=15,
         )
-        
+
         if token_r.status_code != 200:
             issues.append(f"Linked service connectivity check: Authentication failed")
             score -= 30
             return issues, max(0, score), metrics
-        
+
         tok = token_r.json()["access_token"]
         base = (
             f"https://management.azure.com/subscriptions/{cfg['subscription_id']}"
@@ -867,14 +1130,16 @@ def _run_adf_quality_checks(connector_id: int, cfg: dict) -> Tuple[List[dict], f
             f"/providers/Microsoft.DataFactory/factories/{cfg['factory_name']}"
         )
         headers = {"Authorization": f"Bearer {tok}"}
-        
+
         # 1. Pipeline execution status check
         try:
-            pl_r = requests.get(f"{base}/pipelines?api-version=2018-06-01", headers=headers, timeout=20)
+            pl_r = requests.get(
+                f"{base}/pipelines?api-version=2018-06-01", headers=headers, timeout=20
+            )
             if pl_r.status_code == 200:
                 pipelines = pl_r.json().get("value", [])
                 metrics["pipeline_count"] = len(pipelines)
-                
+
                 # Check recent runs for each pipeline
                 failed_pipelines = 0
                 for pl in pipelines:
@@ -882,76 +1147,96 @@ def _run_adf_quality_checks(connector_id: int, cfg: dict) -> Tuple[List[dict], f
                     try:
                         runs_r = requests.get(
                             f"{base}/pipelines/{pl_name}/queryPipelineRuns?api-version=2018-06-01",
-                            headers=headers, json={"lastUpdatedAfter": (datetime.datetime.utcnow() - datetime.timedelta(days=7)).isoformat()},
-                            timeout=20
+                            headers=headers,
+                            json={
+                                "lastUpdatedAfter": (
+                                    datetime.datetime.utcnow()
+                                    - datetime.timedelta(days=7)
+                                ).isoformat()
+                            },
+                            timeout=20,
                         )
                         if runs_r.status_code == 200:
                             runs = runs_r.json().get("value", [])
                             for run in runs:
                                 if run.get("status") == "Failed":
                                     failed_pipelines += 1
-                                    issues.append(f"Pipeline execution status check: Pipeline '{pl_name}' failed")
+                                    issues.append(
+                                        f"Pipeline execution status check: Pipeline '{pl_name}' failed"
+                                    )
                                     score -= 5
                     except Exception:
                         pass
         except Exception as e:
             issues.append(f"Pipeline status check failed: {str(e)}")
             score -= 10
-        
+
         # 2. Failed activity detection
         # 3. Pipeline duration threshold
         # 4. Trigger failure monitoring
         try:
-            trigger_r = requests.get(f"{base}/triggers?api-version=2018-06-01", headers=headers, timeout=20)
+            trigger_r = requests.get(
+                f"{base}/triggers?api-version=2018-06-01", headers=headers, timeout=20
+            )
             if trigger_r.status_code == 200:
                 triggers = trigger_r.json().get("value", [])
                 metrics["trigger_count"] = len(triggers)
                 for trigger in triggers:
                     if trigger.get("properties", {}).get("runtimeState") != "Started":
-                        issues.append(f"Trigger failure monitoring: Trigger '{trigger.get('name')}' is not started")
+                        issues.append(
+                            f"Trigger failure monitoring: Trigger '{trigger.get('name')}' is not started"
+                        )
                         score -= 3
         except Exception:
             pass
-        
+
         # 5. Dataset existence validation
         try:
-            ds_r = requests.get(f"{base}/datasets?api-version=2018-06-01", headers=headers, timeout=20)
+            ds_r = requests.get(
+                f"{base}/datasets?api-version=2018-06-01", headers=headers, timeout=20
+            )
             if ds_r.status_code == 200:
                 datasets = ds_r.json().get("value", [])
                 metrics["dataset_count"] = len(datasets)
         except Exception:
             pass
-        
+
         # 6. Linked service connectivity check
         try:
-            ls_r = requests.get(f"{base}/linkedservices?api-version=2018-06-01", headers=headers, timeout=20)
+            ls_r = requests.get(
+                f"{base}/linkedservices?api-version=2018-06-01",
+                headers=headers,
+                timeout=20,
+            )
             if ls_r.status_code == 200:
                 linked_services = ls_r.json().get("value", [])
                 metrics["linked_service_count"] = len(linked_services)
         except Exception:
             pass
-        
+
         # 7-15: Additional checks would require more detailed ADF API calls
-        
+
     except Exception as e:
         logger.error("ADF quality checks failed: %s", e)
         issues.append(f"ADF quality check error: {str(e)}")
         score -= 30
-    
+
     score = max(0.0, min(100.0, score))
     return issues, score, metrics
 
 
-def _run_databricks_quality_checks(connector_id: int, cfg: dict) -> Tuple[List[dict], float, dict]:
+def _run_databricks_quality_checks(
+    connector_id: int, cfg: dict
+) -> Tuple[List[dict], float, dict]:
     """Run all 15 Databricks quality checks."""
     issues = []
     score = 100.0
     metrics = {}
-    
+
     try:
         base = cfg.get("workspace_url", "").rstrip("/")
         headers = {"Authorization": f"Bearer {cfg.get('token')}"}
-        
+
         # 1. Job failure monitoring
         try:
             r = requests.get(f"{base}/api/2.0/jobs/list", headers=headers, timeout=15)
@@ -962,14 +1247,22 @@ def _run_databricks_quality_checks(connector_id: int, cfg: dict) -> Tuple[List[d
                 for job in jobs:
                     job_id = job.get("job_id")
                     try:
-                        runs_r = requests.get(f"{base}/api/2.0/jobs/runs/list?job_id={job_id}&limit=10", headers=headers, timeout=15)
+                        runs_r = requests.get(
+                            f"{base}/api/2.0/jobs/runs/list?job_id={job_id}&limit=10",
+                            headers=headers,
+                            timeout=15,
+                        )
                         if runs_r.status_code == 200:
                             runs = runs_r.json().get("runs", [])
                             for run in runs:
                                 if run.get("state", {}).get("result_state") == "FAILED":
                                     failed_jobs += 1
-                                    job_name = job.get("settings", {}).get("name", f"job_{job_id}")
-                                    issues.append(f"Job failure monitoring: Job '{job_name}' failed")
+                                    job_name = job.get("settings", {}).get(
+                                        "name", f"job_{job_id}"
+                                    )
+                                    issues.append(
+                                        f"Job failure monitoring: Job '{job_name}' failed"
+                                    )
                                     score -= 5
                                     break
                     except Exception:
@@ -977,32 +1270,38 @@ def _run_databricks_quality_checks(connector_id: int, cfg: dict) -> Tuple[List[d
         except Exception as e:
             issues.append(f"Job monitoring failed: {str(e)}")
             score -= 10
-        
+
         # 2. Cluster health monitoring
         try:
-            r = requests.get(f"{base}/api/2.0/clusters/list", headers=headers, timeout=15)
+            r = requests.get(
+                f"{base}/api/2.0/clusters/list", headers=headers, timeout=15
+            )
             if r.status_code == 200:
                 clusters = r.json().get("clusters", [])
                 metrics["cluster_count"] = len(clusters)
                 for cluster in clusters:
                     state = cluster.get("state")
                     if state in ["ERROR", "TERMINATED"]:
-                        cluster_name = cluster.get("cluster_name", cluster.get("cluster_id"))
-                        issues.append(f"Cluster health monitoring: Cluster '{cluster_name}' is {state}")
+                        cluster_name = cluster.get(
+                            "cluster_name", cluster.get("cluster_id")
+                        )
+                        issues.append(
+                            f"Cluster health monitoring: Cluster '{cluster_name}' is {state}"
+                        )
                         score -= 5
         except Exception as e:
             issues.append(f"Cluster health check failed: {str(e)}")
             score -= 5
-        
+
         # 3. Notebook execution status - covered in job monitoring
-        
+
         # 4-15: Additional checks would require Databricks SQL or more APIs
-        
+
     except Exception as e:
         logger.error("Databricks quality checks failed: %s", e)
         issues.append(f"Databricks quality check error: {str(e)}")
         score -= 30
-    
+
     score = max(0.0, min(100.0, score))
     return issues, score, metrics
 
@@ -1056,10 +1355,15 @@ def _run_scan(connector_id: int) -> Dict[str, Any]:
                     )
                     _create_alert(
                         "schema_drift",
-                        "high" if (drift["removed"] or drift["type_changes"]) else "medium",
+                        (
+                            "high"
+                            if (drift["removed"] or drift["type_changes"])
+                            else "medium"
+                        ),
                         f"Schema drift on {ds.get('name')}",
                         msg,
-                        connector_id=connector_id, dataset_id=ds_id,
+                        connector_id=connector_id,
+                        dataset_id=ds_id,
                         ai_payload={
                             "category": "schema_drift",
                             "connector_type": ctype,
@@ -1067,6 +1371,78 @@ def _run_scan(connector_id: int) -> Dict[str, Any]:
                             "changes": drift,
                         },
                     )
+
+            # ===== Run LLM-powered quality checks =====
+            try:
+                ds_full = fetch_one(
+                    "SELECT d.*, c.name AS connector_name FROM datasets d JOIN connectors c ON d.connector_id=c.id WHERE d.id=%s",
+                    (ds_id,),
+                )
+                if ds_full and ds_full.get("column_count", 0) > 0:
+                    issues, quality_score, _, pii_cols, pii_cats = (
+                        _run_ai_quality_checks(ds_id, ds_full)
+                    )
+
+                    # Update dataset with LLM results
+                    pii_categories = ",".join(pii_cats) if pii_cats else None
+                    execute(
+                        "UPDATE datasets SET quality_score=%s, pii_categories=%s, contains_pii=%s WHERE id=%s",
+                        (quality_score, pii_categories, 1 if pii_cats else 0, ds_id),
+                    )
+
+                    # Log quality check event
+                    if issues:
+                        issue_str = "; ".join(issues[:5])  # Limit to first 5 issues
+                        _log_monitoring_event(
+                            "quality_check",
+                            issue_str,
+                            dataset_id=ds_id,
+                            connector_id=connector_id,
+                        )
+
+                    # Create alert if quality is low
+                    if quality_score < 70:
+                        _create_alert(
+                            "quality",
+                            "high" if quality_score < 50 else "medium",
+                            f"Low data quality detected on {ds.get('name')}",
+                            f"Quality score: {quality_score:.1f}/100. Issues: {'; '.join(issues[:3])}",
+                            connector_id=connector_id,
+                            dataset_id=ds_id,
+                            ai_payload={
+                                "category": "quality",
+                                "dataset": f"{ds.get('schema') or ''}.{ds.get('name')}",
+                                "quality_score": quality_score,
+                                "issues": issues,
+                            },
+                        )
+
+                    # Create alert if PII detected
+                    if pii_cats:
+                        _create_alert(
+                            "pii",
+                            "high",
+                            f"PII data detected on {ds.get('name')}",
+                            f"PII categories: {', '.join(pii_cats)}. Columns: {', '.join(pii_cols[:5])}",
+                            connector_id=connector_id,
+                            dataset_id=ds_id,
+                            ai_payload={
+                                "category": "pii",
+                                "dataset": f"{ds.get('schema') or ''}.{ds.get('name')}",
+                                "pii_categories": pii_cats,
+                                "pii_columns": pii_cols,
+                            },
+                        )
+
+                    logger.info(
+                        "LLM quality check complete for dataset %s: score=%.1f, pii=%s",
+                        ds_id,
+                        quality_score,
+                        pii_cats,
+                    )
+            except Exception as e:
+                logger.warning("LLM quality check failed for dataset %s: %s", ds_id, e)
+
             # mark PII
             row = fetch_one("SELECT contains_pii FROM datasets WHERE id=%s", (ds_id,))
             if row and row["contains_pii"]:
@@ -1091,11 +1467,16 @@ def _run_scan(connector_id: int) -> Dict[str, Any]:
         )
         execute("UPDATE connectors SET status='unhealthy' WHERE id=%s", (connector_id,))
         _create_alert(
-            "pipeline", "critical",
+            "pipeline",
+            "critical",
             f"Scan failed for connector #{connector_id}",
             str(e)[:500],
             connector_id=connector_id,
-            ai_payload={"category": "pipeline", "error": str(e)[:500], "connector_type": ctype},
+            ai_payload={
+                "category": "pipeline",
+                "error": str(e)[:500],
+                "connector_type": ctype,
+            },
         )
         raise
 
@@ -1103,6 +1484,7 @@ def _run_scan(connector_id: int) -> Dict[str, Any]:
 def _scan_mssql(conn_row: dict) -> Dict[str, Any]:
     """MSSQL scan via pyodbc if available."""
     import pyodbc  # type: ignore
+
     cfg = decrypt_config(conn_row["config_json"])
     drivers = [d for d in pyodbc.drivers() if "SQL Server" in d]
     if not drivers:
@@ -1132,15 +1514,22 @@ def _scan_mssql(conn_row: dict) -> Dict[str, Any]:
             cur.execute(
                 "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS "
                 "WHERE TABLE_SCHEMA=? AND TABLE_NAME=? ORDER BY ORDINAL_POSITION",
-                schema, name,
+                schema,
+                name,
             )
             cols = cur.fetchall()
-            discovered.append({
-                "schema": schema, "name": name, "type": ttype, "row_count": row_count,
-                "columns": [
-                    {"name": c[0], "type": c[1], "nullable": c[2] == "YES"} for c in cols
-                ],
-            })
+            discovered.append(
+                {
+                    "schema": schema,
+                    "name": name,
+                    "type": ttype,
+                    "row_count": row_count,
+                    "columns": [
+                        {"name": c[0], "type": c[1], "nullable": c[2] == "YES"}
+                        for c in cols
+                    ],
+                }
+            )
     finally:
         cn.close()
     return {"datasets": discovered}
@@ -1148,8 +1537,11 @@ def _scan_mssql(conn_row: dict) -> Dict[str, Any]:
 
 # ---------- routes --------------------------------------------------------
 @router.post("/scan/{connector_id}")
-def scan_connector(connector_id: int, background: BackgroundTasks,
-                   user: dict = Depends(require_roles("admin", "steward"))):
+def scan_connector(
+    connector_id: int,
+    background: BackgroundTasks,
+    user: dict = Depends(require_roles("admin", "steward")),
+):
     if not fetch_one("SELECT id FROM connectors WHERE id=%s", (connector_id,)):
         raise HTTPException(status_code=404, detail="Connector not found")
     try:
@@ -1167,15 +1559,17 @@ def quality_check_all_datasets(
 ):
     if not fetch_one("SELECT id FROM connectors WHERE id=%s", (connector_id,)):
         raise HTTPException(status_code=404, detail="Connector not found")
-    
+
     def run_all_checks():
         conn_row = fetch_one("SELECT * FROM connectors WHERE id=%s", (connector_id,))
         ctype = conn_row["type"]
         cfg = decrypt_config(conn_row["config_json"])
         results = []
-        
+
         if ctype in ["mysql", "mssql"]:
-            datasets = fetch_all("SELECT id FROM datasets WHERE connector_id=%s", (connector_id,))
+            datasets = fetch_all(
+                "SELECT id FROM datasets WHERE connector_id=%s", (connector_id,)
+            )
             for ds in datasets:
                 dataset_id = ds["id"]
                 try:
@@ -1193,29 +1587,39 @@ def quality_check_all_datasets(
                                 schema = ds_info["schema_name"] or cfg.get("database")
                                 name = ds_info["dataset_name"]
                                 try:
-                                    cur.execute(f"SELECT * FROM `{schema}`.`{name}` LIMIT 20")
+                                    cur.execute(
+                                        f"SELECT * FROM `{schema}`.`{name}` LIMIT 20"
+                                    )
                                     sample_rows = cur.fetchall()
                                 except Exception:
                                     pass
                             cn.close()
                         except Exception:
                             pass
-                        
-                        ai_issues, ai_score, ai_metrics, pii_columns, pii_categories = _run_ai_quality_checks(
-                            dataset_id, ds_info, sample_rows
+
+                        ai_issues, ai_score, ai_metrics, pii_columns, pii_categories = (
+                            _run_ai_quality_checks(dataset_id, ds_info, sample_rows)
                         )
-                        
-                        issues, score, metrics = _run_mysql_quality_checks(dataset_id, cfg, ds_info)
-                        
+
+                        issues, score, metrics = _run_mysql_quality_checks(
+                            dataset_id, cfg, ds_info
+                        )
+
                         issues.extend(ai_issues)
                         combined_score = (score + ai_score) / 2
-                        
-                        validation_results = _execute_validation_rules(dataset_id, ds_info["config_json"])
-                        failed_rules = [r for r in validation_results if not r["passed"]]
+
+                        validation_results = _execute_validation_rules(
+                            dataset_id, ds_info["config_json"]
+                        )
+                        failed_rules = [
+                            r for r in validation_results if not r["passed"]
+                        ]
                         for r in failed_rules:
-                            issues.append(f"Rule '{r['rule_name']}' failed: {r['message']}")
+                            issues.append(
+                                f"Rule '{r['rule_name']}' failed: {r['message']}"
+                            )
                             combined_score -= 5
-                        
+
                         if pii_columns:
                             pii_cat_str = ",".join(sorted(set(pii_categories)))
                             execute(
@@ -1227,7 +1631,7 @@ def quality_check_all_datasets(
                                     "UPDATE dataset_columns SET is_pii=1 WHERE dataset_id=%s AND column_name=%s",
                                     (dataset_id, col_name),
                                 )
-                        
+
                         combined_score = max(0.0, min(100.0, combined_score))
                         execute(
                             "UPDATE datasets SET quality_score=%s, last_profiled_at=%s WHERE id=%s",
@@ -1236,19 +1640,28 @@ def quality_check_all_datasets(
                         execute(
                             "INSERT INTO monitoring_runs (connector_id, dataset_id, run_type, status, message, "
                             "metrics_json, finished_at) VALUES (%s, %s, 'quality', 'success', %s, %s, %s)",
-                            (ds_info["connector_id"], dataset_id, f"score={combined_score}",
-                             safe_json_dumps({**metrics, **ai_metrics}), datetime.datetime.utcnow()),
+                            (
+                                ds_info["connector_id"],
+                                dataset_id,
+                                f"score={combined_score}",
+                                safe_json_dumps({**metrics, **ai_metrics}),
+                                datetime.datetime.utcnow(),
+                            ),
                         )
-                        
+
                         _log_monitoring_event(
                             log_type="quality_check",
                             log_content=f"Quality check on {ds_info['dataset_name']}: score {combined_score:.1f}, issues {len(issues)}",
                             dataset_id=dataset_id,
                             connector_id=ds_info["connector_id"],
                         )
-                        
+
                         if issues:
-                            severity = "high" if combined_score < 70 else ("medium" if combined_score < 85 else "low")
+                            severity = (
+                                "high"
+                                if combined_score < 70
+                                else ("medium" if combined_score < 85 else "low")
+                            )
                             _create_alert(
                                 "quality",
                                 severity,
@@ -1256,93 +1669,131 @@ def quality_check_all_datasets(
                                 f"Score: {combined_score:.1f} - {'; '.join(issues[:10])}",
                                 connector_id=ds_info["connector_id"],
                                 dataset_id=dataset_id,
-                                ai_payload={"score": combined_score, "issues": issues, "metrics": {**metrics, **ai_metrics}},
+                                ai_payload={
+                                    "score": combined_score,
+                                    "issues": issues,
+                                    "metrics": {**metrics, **ai_metrics},
+                                },
                             )
-                        
-                        results.append({
-                            "dataset_id": dataset_id,
-                            "score": combined_score,
-                            "issues": len(issues),
-                        })
+
+                        results.append(
+                            {
+                                "dataset_id": dataset_id,
+                                "score": combined_score,
+                                "issues": len(issues),
+                            }
+                        )
                 except Exception as e:
-                    logger.exception("Quality check failed for dataset %s: %s", dataset_id, e)
-                    results.append({
-                        "dataset_id": dataset_id,
-                        "error": str(e),
-                    })
-        
+                    logger.exception(
+                        "Quality check failed for dataset %s: %s", dataset_id, e
+                    )
+                    results.append(
+                        {
+                            "dataset_id": dataset_id,
+                            "error": str(e),
+                        }
+                    )
+
         elif ctype == "azure_adf":
             try:
                 issues, score, metrics = _run_adf_quality_checks(connector_id, cfg)
-                
+
                 execute(
                     "INSERT INTO monitoring_runs (connector_id, run_type, status, message, "
                     "metrics_json, finished_at) VALUES (%s, 'quality', 'success', %s, %s, %s)",
-                    (connector_id, f"score={score}", safe_json_dumps(metrics), datetime.datetime.utcnow()),
+                    (
+                        connector_id,
+                        f"score={score}",
+                        safe_json_dumps(metrics),
+                        datetime.datetime.utcnow(),
+                    ),
                 )
-                
+
                 _log_monitoring_event(
                     log_type="quality_check",
                     log_content=f"ADF quality check: score {score:.1f}, issues {len(issues)}",
                     connector_id=connector_id,
                 )
-                
+
                 if issues:
-                    severity = "high" if score < 70 else ("medium" if score < 85 else "low")
+                    severity = (
+                        "high" if score < 70 else ("medium" if score < 85 else "low")
+                    )
                     _create_alert(
                         "pipeline",
                         severity,
                         f"ADF quality issues detected (score {score:.1f})",
                         f"Score: {score:.1f} - {'; '.join(issues[:10])}",
                         connector_id=connector_id,
-                        ai_payload={"score": score, "issues": issues, "metrics": metrics},
+                        ai_payload={
+                            "score": score,
+                            "issues": issues,
+                            "metrics": metrics,
+                        },
                     )
-                
-                results.append({
-                    "connector_id": connector_id,
-                    "score": score,
-                    "issues": len(issues),
-                })
+
+                results.append(
+                    {
+                        "connector_id": connector_id,
+                        "score": score,
+                        "issues": len(issues),
+                    }
+                )
             except Exception as e:
                 logger.exception("ADF quality check failed: %s", e)
-        
+
         elif ctype == "databricks":
             try:
-                issues, score, metrics = _run_databricks_quality_checks(connector_id, cfg)
-                
+                issues, score, metrics = _run_databricks_quality_checks(
+                    connector_id, cfg
+                )
+
                 execute(
                     "INSERT INTO monitoring_runs (connector_id, run_type, status, message, "
                     "metrics_json, finished_at) VALUES (%s, 'quality', 'success', %s, %s, %s)",
-                    (connector_id, f"score={score}", safe_json_dumps(metrics), datetime.datetime.utcnow()),
+                    (
+                        connector_id,
+                        f"score={score}",
+                        safe_json_dumps(metrics),
+                        datetime.datetime.utcnow(),
+                    ),
                 )
-                
+
                 _log_monitoring_event(
                     log_type="quality_check",
                     log_content=f"Databricks quality check: score {score:.1f}, issues {len(issues)}",
                     connector_id=connector_id,
                 )
-                
+
                 if issues:
-                    severity = "high" if score < 70 else ("medium" if score < 85 else "low")
+                    severity = (
+                        "high" if score < 70 else ("medium" if score < 85 else "low")
+                    )
                     _create_alert(
                         "databricks",
                         severity,
                         f"Databricks quality issues detected (score {score:.1f})",
                         f"Score: {score:.1f} - {'; '.join(issues[:10])}",
                         connector_id=connector_id,
-                        ai_payload={"score": score, "issues": issues, "metrics": metrics},
+                        ai_payload={
+                            "score": score,
+                            "issues": issues,
+                            "metrics": metrics,
+                        },
                     )
-                
-                results.append({
-                    "connector_id": connector_id,
-                    "score": score,
-                    "issues": len(issues),
-                })
+
+                results.append(
+                    {
+                        "connector_id": connector_id,
+                        "score": score,
+                        "issues": len(issues),
+                    }
+                )
             except Exception as e:
                 logger.exception("Databricks quality check failed: %s", e)
-        
+
         logger.info("Quality check all complete for connector %s", connector_id)
-    
+
     background.add_task(run_all_checks)
     return {
         "status": "success",
@@ -1351,7 +1802,9 @@ def quality_check_all_datasets(
 
 
 @router.post("/quality-check/{dataset_id}")
-def quality_check(dataset_id: int, user: dict = Depends(require_roles("admin", "steward"))):
+def quality_check(
+    dataset_id: int, user: dict = Depends(require_roles("admin", "steward"))
+):
     ds = fetch_one(
         "SELECT d.*, c.type AS connector_type, c.config_json "
         "FROM datasets d JOIN connectors c ON c.id=d.connector_id WHERE d.id=%s",
@@ -1359,19 +1812,21 @@ def quality_check(dataset_id: int, user: dict = Depends(require_roles("admin", "
     )
     if not ds:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    
+
     if ds["connector_type"] != "mysql":
-        raise HTTPException(status_code=400, detail="Quality check supported on MySQL datasets only")
-    
+        raise HTTPException(
+            status_code=400, detail="Quality check supported on MySQL datasets only"
+        )
+
     cfg = decrypt_config(ds["config_json"])
     issues, score, metrics = _run_mysql_quality_checks(dataset_id, cfg, ds)
-    
+
     validation_results = _execute_validation_rules(dataset_id, ds["config_json"])
     failed_rules = [r for r in validation_results if not r["passed"]]
     for r in failed_rules:
         issues.append(f"Rule '{r['rule_name']}' failed: {r['message']}")
         score -= 10
-    
+
     score = max(0.0, min(100.0, score))
     execute(
         "UPDATE datasets SET quality_score=%s, last_profiled_at=%s WHERE id=%s",
@@ -1380,41 +1835,53 @@ def quality_check(dataset_id: int, user: dict = Depends(require_roles("admin", "
     run_id = execute(
         "INSERT INTO monitoring_runs (connector_id, dataset_id, run_type, status, message, "
         "metrics_json, finished_at) VALUES (%s, %s, 'quality', 'success', %s, %s, %s)",
-        (ds["connector_id"], dataset_id, f"score={score}",
-         safe_json_dumps(metrics), datetime.datetime.utcnow()),
+        (
+            ds["connector_id"],
+            dataset_id,
+            f"score={score}",
+            safe_json_dumps(metrics),
+            datetime.datetime.utcnow(),
+        ),
     )
-    
+
     _log_monitoring_event(
         log_type="quality_check",
         log_content=f"Quality check on {ds['dataset_name']}: score {score:.1f}, issues {len(issues)}, rules {len(validation_results)}",
         dataset_id=dataset_id,
         connector_id=ds["connector_id"],
     )
-    
+
     if issues:
         severity = "high" if score < 70 else ("medium" if score < 85 else "low")
         _create_alert(
-            "quality", severity,
+            "quality",
+            severity,
             f"Quality issues on {ds['dataset_name']} (score {score:.1f})",
             "; ".join(issues[:10]),
-            connector_id=ds["connector_id"], dataset_id=dataset_id,
+            connector_id=ds["connector_id"],
+            dataset_id=dataset_id,
             ai_payload={
-                "category": "quality", "dataset": ds["dataset_name"],
-                "score": score, "issues": issues, "metrics": metrics,
+                "category": "quality",
+                "dataset": ds["dataset_name"],
+                "score": score,
+                "issues": issues,
+                "metrics": metrics,
                 "validation_results": validation_results,
             },
         )
     return {
-        "score": score, 
-        "issues": issues, 
-        "metrics": metrics, 
+        "score": score,
+        "issues": issues,
+        "metrics": metrics,
         "validation_results": validation_results,
-        "run_id": run_id
+        "run_id": run_id,
     }
 
 
 @router.post("/schema-drift/{dataset_id}")
-def schema_drift_endpoint(dataset_id: int, user: dict = Depends(require_roles("admin", "steward"))):
+def schema_drift_endpoint(
+    dataset_id: int, user: dict = Depends(require_roles("admin", "steward"))
+):
     if not fetch_one("SELECT id FROM datasets WHERE id=%s", (dataset_id,)):
         raise HTTPException(status_code=404, detail="Dataset not found")
     drift = _detect_schema_drift(dataset_id)
@@ -1436,7 +1903,9 @@ def pii_scan(dataset_id: int, user: dict = Depends(require_roles("admin", "stewa
     for c in cols:
         cat = detect_pii_in_column_name(c["column_name"])
         if cat:
-            pii_results.append({"column": c["column_name"], "category": cat, "source": "name"})
+            pii_results.append(
+                {"column": c["column_name"], "category": cat, "source": "name"}
+            )
             execute(
                 "UPDATE dataset_columns SET is_pii=1, pii_category=%s WHERE id=%s",
                 (cat, c["id"]),
@@ -1457,7 +1926,9 @@ def pii_scan(dataset_id: int, user: dict = Depends(require_roles("admin", "stewa
                         samples = [str(r["v"]) for r in cur.fetchall()]
                         cat = detect_pii_in_samples(samples)
                         if cat and not any(p["column"] == col for p in pii_results):
-                            pii_results.append({"column": col, "category": cat, "source": "value"})
+                            pii_results.append(
+                                {"column": col, "category": cat, "source": "value"}
+                            )
                             execute(
                                 "UPDATE dataset_columns SET is_pii=1, pii_category=%s WHERE id=%s",
                                 (cat, c["id"]),
@@ -1470,20 +1941,30 @@ def pii_scan(dataset_id: int, user: dict = Depends(require_roles("admin", "stewa
 
     if pii_results:
         cats = ",".join(sorted({p["category"] for p in pii_results}))
-        execute("UPDATE datasets SET contains_pii=1, pii_categories=%s WHERE id=%s",
-                (cats, dataset_id))
+        execute(
+            "UPDATE datasets SET contains_pii=1, pii_categories=%s WHERE id=%s",
+            (cats, dataset_id),
+        )
         _create_alert(
-            "pii", "high",
+            "pii",
+            "high",
             f"PII detected in {ds['dataset_name']}",
-            f"Sensitive categories: {cats}. Columns: " + ", ".join(p["column"] for p in pii_results),
-            connector_id=ds["connector_id"], dataset_id=dataset_id,
+            f"Sensitive categories: {cats}. Columns: "
+            + ", ".join(p["column"] for p in pii_results),
+            connector_id=ds["connector_id"],
+            dataset_id=dataset_id,
             ai_payload={
-                "category": "pii", "dataset": ds["dataset_name"],
-                "categories": cats, "columns": pii_results,
+                "category": "pii",
+                "dataset": ds["dataset_name"],
+                "categories": cats,
+                "columns": pii_results,
             },
         )
     else:
-        execute("UPDATE datasets SET contains_pii=0, pii_categories=NULL WHERE id=%s", (dataset_id,))
+        execute(
+            "UPDATE datasets SET contains_pii=0, pii_categories=NULL WHERE id=%s",
+            (dataset_id,),
+        )
 
     return {"pii": pii_results}
 
@@ -1519,12 +2000,19 @@ class JobIn(BaseModel):
 def create_job(body: JobIn, user: dict = Depends(require_roles("admin", "steward"))):
     if not fetch_one("SELECT id FROM connectors WHERE id=%s", (body.connector_id,)):
         raise HTTPException(status_code=404, detail="Connector not found")
-    next_run = datetime.datetime.utcnow() + datetime.timedelta(minutes=body.interval_minutes)
+    next_run = datetime.datetime.utcnow() + datetime.timedelta(
+        minutes=body.interval_minutes
+    )
     new_id = execute(
         "INSERT INTO monitoring_jobs (connector_id, job_type, interval_minutes, enabled, next_run_at) "
         "VALUES (%s, %s, %s, %s, %s)",
-        (body.connector_id, body.job_type, body.interval_minutes,
-         1 if body.enabled else 0, next_run),
+        (
+            body.connector_id,
+            body.job_type,
+            body.interval_minutes,
+            1 if body.enabled else 0,
+            next_run,
+        ),
     )
     return {"id": new_id, "message": "Monitoring job created"}
 
@@ -1539,8 +2027,58 @@ def delete_job(job_id: int, user: dict = Depends(require_roles("admin", "steward
 def get_quality_checks(connector_type: str, user: dict = Depends(get_current_user)):
     """Get list of available quality checks for a specific connector type."""
     if connector_type not in QUALITY_CHECKS:
-        raise HTTPException(status_code=400, detail=f"Connector type '{connector_type}' not supported. Available types: {', '.join(QUALITY_CHECKS.keys())}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Connector type '{connector_type}' not supported. Available types: {', '.join(QUALITY_CHECKS.keys())}",
+        )
     return {
         "connector_type": connector_type,
-        "quality_checks": QUALITY_CHECKS[connector_type]
+        "quality_checks": QUALITY_CHECKS[connector_type],
     }
+
+
+@router.get("/debug/rule-books")
+def debug_rule_books(user: dict = Depends(require_roles("admin"))):
+    """Debug endpoint: Check if rule books are in ChromaDB and search for one."""
+    try:
+        # Search for any rule book
+        results = search_rule_books("quality check", top_k=5)
+
+        rule_books = fetch_all(
+            "SELECT id, name, filename FROM rule_books ORDER BY id DESC LIMIT 10"
+        )
+
+        return {
+            "status": "ok",
+            "rule_books_in_db": len(rule_books),
+            "rule_books_list": rule_books,
+            "chroma_search_results": results,
+            "chroma_results_count": len(results),
+        }
+    except Exception as e:
+        logger.error("Debug rule books failed: %s", e)
+        return {
+            "status": "error",
+            "error": str(e),
+        }
+
+
+@router.post("/manual-scan/{connector_id}")
+def manual_trigger_scan(
+    connector_id: int,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(require_roles("admin")),
+):
+    """Manually trigger a scan for a connector."""
+    try:
+        conn = fetch_one("SELECT id, name FROM connectors WHERE id=%s", (connector_id,))
+        if not conn:
+            raise HTTPException(status_code=404, detail="Connector not found")
+
+        background_tasks.add_task(_run_scan, connector_id)
+        logger.info("Scan triggered for connector %d (%s)", connector_id, conn["name"])
+
+        return {"status": "ok", "message": f"Scan queued for {conn['name']}"}
+    except Exception as e:
+        logger.error("Manual scan trigger failed: %s", e)
+        return {"status": "error", "error": str(e)}

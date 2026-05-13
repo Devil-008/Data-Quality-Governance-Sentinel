@@ -60,16 +60,14 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
                     size="small"
                     color={d.quality_score >= 90 ? 'success' : d.quality_score >= 70 ? 'warning' : 'error'}
                   />
-                ) : (
-                  '-'
-                )}
+                ) : null}
               </TableCell>
               <TableCell>
-                {d.contains_pii ? (
+                {d.contains_pii === true ? (
                   <Chip label="PII" size="small" color="error" />
-                ) : (
+                ) : d.contains_pii === false ? (
                   <Chip label="None" size="small" variant="outlined" />
-                )}
+                ) : null}
               </TableCell>
               <TableCell align="right">
                 <Tooltip title="View Profile">

@@ -1,4 +1,5 @@
 """DQ Sentinel — FastAPI application entry point."""
+
 import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -19,6 +20,8 @@ from controllers.ai_controller import router as ai_router
 from controllers.settings_controller import router as settings_router
 from controllers.rule_book_controller import router as rule_book_router
 from scheduler.monitoring_scheduler import start_scheduler, shutdown_scheduler
+from scheduler.quality_check_scheduler import start as start_quality_check_scheduler
+from scheduler.quality_check_scheduler import stop as stop_quality_check_scheduler
 from utils.common import logger
 
 load_dotenv()
@@ -28,8 +31,10 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     logger.info("DQ Sentinel starting up...")
     start_scheduler()
+    start_quality_check_scheduler()
     yield
     shutdown_scheduler()
+    stop_quality_check_scheduler()
     logger.info("DQ Sentinel shutting down...")
 
 
@@ -82,6 +87,7 @@ app.include_router(rule_book_router)
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "main:app",
         host=os.getenv("APP_HOST", "0.0.0.0"),

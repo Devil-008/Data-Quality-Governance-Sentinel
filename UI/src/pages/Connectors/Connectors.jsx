@@ -8,13 +8,13 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
-import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import EditIcon from '@mui/icons-material/Edit';
 import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
-  fetchConnectors, createConnector, testConnection, scanConnector, qualityCheckAllDatasets,
-  deleteConnector, clearTestResult, clearScanResult, clearQualityCheckAllResult, testExistingConnector,
+  fetchConnectors, createConnector, testConnection, deleteConnector, updateConnector, 
+  clearTestResult, testExistingConnector,
 } from '../../redux/slices/connectorSlice';
 import Loader from '../../components/Loader';
 
@@ -62,17 +62,18 @@ const TYPE_FIELDS = {
 
 const Connectors = () => {
   const dispatch = useDispatch();
-  const { list, loading, error, testResult, scanResult, qualityCheckAllResult, testLoading } =
+  const navigate = useNavigate();
+  const { list, loading, error, testResult, testLoading } =
     useSelector((s) => s.connectors);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [type, setType] = useState('mysql');
   const [config, setConfig] = useState({});
   const [savingError, setSavingError] = useState(null);
   const [runningTest, setRunningTest] = useState({});
-  const [runningScan, setRunningScan] = useState({});
-  const [runningQualityCheckAll, setRunningQualityCheckAll] = useState({});
 
   useEffect(() => {
     dispatch(fetchConnectors());
@@ -83,14 +84,29 @@ const Connectors = () => {
     (TYPE_FIELDS[type] || []).forEach((f) => {
       if (f.defaultValue !== undefined) defaults[f.key] = f.defaultValue;
     });
-    setConfig(defaults);
+    if (!editMode) {
+      setConfig(defaults);
+    }
     dispatch(clearTestResult());
-  }, [type, dispatch]);
+  }, [type, dispatch, editMode]);
 
-  const openDialog = () => {
+  const openAddDialog = () => {
+    setEditMode(false);
+    setEditingId(null);
     setName('');
     setType('mysql');
     setConfig({});
+    setSavingError(null);
+    dispatch(clearTestResult());
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (connector) => {
+    setEditMode(true);
+    setEditingId(connector.id);
+    setName(connector.name);
+    setType(connector.type);
+    setConfig(connector.config || {});
     setSavingError(null);
     dispatch(clearTestResult());
     setDialogOpen(true);
@@ -121,12 +137,19 @@ const Connectors = () => {
         return;
       }
     }
-    const res = await dispatch(createConnector({ name, type, config }));
-    if (createConnector.fulfilled.match(res)) {
+    
+    let res;
+    if (editMode) {
+      res = await dispatch(updateConnector({ id: editingId, name, type, config }));
+    } else {
+      res = await dispatch(createConnector({ name, type, config }));
+    }
+    
+    if (createConnector.fulfilled.match(res) || updateConnector.fulfilled.match(res)) {
       closeDialog();
       dispatch(fetchConnectors());
     } else {
-      setSavingError(res.payload || 'Failed to create connector');
+      setSavingError(res.payload || (editMode ? 'Failed to update connector' : 'Failed to create connector'));
     }
   };
 
@@ -134,20 +157,6 @@ const Connectors = () => {
     setRunningTest((s) => ({ ...s, [id]: true }));
     await dispatch(testExistingConnector(id));
     setRunningTest((s) => ({ ...s, [id]: false }));
-    dispatch(fetchConnectors());
-  };
-
-  const handleScan = async (id) => {
-    setRunningScan((s) => ({ ...s, [id]: true }));
-    await dispatch(scanConnector(id));
-    setRunningScan((s) => ({ ...s, [id]: false }));
-    dispatch(fetchConnectors());
-  };
-
-  const handleQualityCheckAll = async (id) => {
-    setRunningQualityCheckAll((s) => ({ ...s, [id]: true }));
-    await dispatch(qualityCheckAllDatasets(id));
-    setRunningQualityCheckAll((s) => ({ ...s, [id]: false }));
     dispatch(fetchConnectors());
   };
 
@@ -167,35 +176,13 @@ const Connectors = () => {
           <Button startIcon={<RefreshIcon />} onClick={() => dispatch(fetchConnectors())} variant="outlined">
             Refresh
           </Button>
-          <Button startIcon={<AddIcon />} onClick={openDialog} variant="contained">
+          <Button startIcon={<AddIcon />} onClick={openAddDialog} variant="contained">
             Add Connector
           </Button>
         </Stack>
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {scanResult && (
-        <Alert
-          severity={scanResult.status === 'failed' ? 'error' : 'success'}
-          sx={{ mb: 2 }}
-          onClose={() => dispatch(clearScanResult())}
-        >
-          {scanResult.status === 'failed'
-            ? `Scan failed: ${scanResult.error || 'unknown error'}`
-            : `Scan complete. Datasets: ${scanResult.result?.datasets ?? 0}, schema drifts: ${scanResult.result?.drifts ?? 0}, PII datasets: ${scanResult.result?.pii_datasets ?? 0}.`}
-        </Alert>
-      )}
-      {qualityCheckAllResult && (
-        <Alert
-          severity={qualityCheckAllResult.status === 'failed' ? 'error' : 'success'}
-          sx={{ mb: 2 }}
-          onClose={() => dispatch(clearQualityCheckAllResult())}
-        >
-          {qualityCheckAllResult.status === 'failed'
-            ? `Quality check failed: ${qualityCheckAllResult.error || 'unknown error'}`
-            : qualityCheckAllResult.message || 'Quality checks started!'}
-        </Alert>
-      )}
 
       <Card>
         <CardContent>
@@ -216,7 +203,6 @@ const Connectors = () => {
                     <TableCell><strong>Type</strong></TableCell>
                     <TableCell><strong>Status</strong></TableCell>
                     <TableCell><strong>Last Tested</strong></TableCell>
-                    <TableCell><strong>Last Scanned</strong></TableCell>
                     <TableCell align="right"><strong>Actions</strong></TableCell>
                   </TableRow>
                 </TableHead>
@@ -229,17 +215,12 @@ const Connectors = () => {
                         <Chip
                           label={c.status || 'unknown'}
                           size="small"
-                          color={c.status === 'healthy' ? 'success' : c.status === 'unhealthy' || c.status === 'failed' ? 'error' : 'default'}
+                          color={c.status === 'Connected' ? 'success' : c.status === 'Connection Failed' ? 'error' : 'default'}
                         />
                       </TableCell>
                       <TableCell>
                         <Typography variant="caption">
                           {c.last_tested_at ? new Date(c.last_tested_at).toLocaleString() : '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption">
-                          {c.last_scanned_at ? new Date(c.last_scanned_at).toLocaleString() : '-'}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
@@ -250,19 +231,10 @@ const Connectors = () => {
                             </IconButton>
                           </span>
                         </Tooltip>
-                        <Tooltip title="Run Scan">
-                          <span>
-                            <IconButton size="small" color="primary" onClick={() => handleScan(c.id)} disabled={runningScan[c.id]}>
-                              {runningScan[c.id] ? <CircularProgress size={16} /> : <PlayCircleIcon fontSize="small" />}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title="Run Quality Check on All Datasets">
-                          <span>
-                            <IconButton size="small" color="success" onClick={() => handleQualityCheckAll(c.id)} disabled={runningQualityCheckAll[c.id]}>
-                              {runningQualityCheckAll[c.id] ? <CircularProgress size={16} /> : <CheckCircleIcon fontSize="small" />}
-                            </IconButton>
-                          </span>
+                        <Tooltip title="Edit">
+                          <IconButton size="small" color="primary" onClick={() => openEditDialog(c)}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete">
                           <IconButton size="small" color="error" onClick={() => handleDelete(c.id)}>
@@ -280,7 +252,7 @@ const Connectors = () => {
       </Card>
 
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Connector</DialogTitle>
+        <DialogTitle>{editMode ? 'Edit Connector' : 'Add Connector'}</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {savingError && <Alert severity="error">{savingError}</Alert>}

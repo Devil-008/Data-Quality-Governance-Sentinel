@@ -3,6 +3,7 @@
 Used by the monitoring/alerts pipeline and by the AI controller. Never invents
 data — caller passes real metrics in, the model produces analysis only.
 """
+
 import os
 import json
 import requests
@@ -44,10 +45,17 @@ def _chat(system: str, user: str, timeout: int = 60, max_tokens: int = 2000) -> 
             timeout=timeout,
         )
         if resp.status_code != 200:
-            logger.warning("Mistral API non-200: %s %s", resp.status_code, resp.text[:200])
+            logger.warning(
+                "Mistral API non-200: %s %s", resp.status_code, resp.text[:200]
+            )
             return ""
         data = resp.json()
-        return (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
+        return (
+            (data.get("choices") or [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
     except Exception as e:
         logger.error("Mistral call failed: %s", e)
         return ""
@@ -77,7 +85,7 @@ def _parse_json_block(text: str) -> Dict[str, Any]:
         start, end = text.find("{"), text.rfind("}")
         if start >= 0 and end > start:
             try:
-                return json.loads(text[start:end + 1])
+                return json.loads(text[start : end + 1])
             except Exception:
                 return {"summary": text}
         return {"summary": text}
@@ -149,24 +157,40 @@ def validate_dataset_quality(
             "anomalies": [],
             "recommendations": ["Enable AI for comprehensive quality checks"],
         }
-    
+
+    # Check if rule books exist
+    if not rule_chunks:
+        logger.warning(
+            "No rule books found in ChromaDB for dataset %d", dataset_metadata.get("id")
+        )
+
     user_input = {
         "dataset_metadata": dataset_metadata,
         "schema": schema,
         "sample_rows": sample_rows or [],
         "rule_books": rule_chunks or [],
     }
-    
+
     user_msg = f"""Validate the quality of this dataset using the provided Rule Books.
 
 DATASET INFORMATION:
 {json.dumps(user_input, default=str, indent=2)}
 
 Respond with JSON only as specified."""
-    
-    text = _chat(QUALITY_VALIDATION_SYSTEM_PROMPT, user_msg, timeout=90, max_tokens=3000)
+
+    text = _chat(
+        QUALITY_VALIDATION_SYSTEM_PROMPT, user_msg, timeout=90, max_tokens=3000
+    )
     parsed = _parse_json_block(text)
-    
+
+    logger.debug(
+        "LLM validation result: dataset=%d, score=%s, issues=%s, pii=%s",
+        dataset_metadata.get("id"),
+        parsed.get("quality_score"),
+        parsed.get("issues"),
+        parsed.get("pii_categories"),
+    )
+
     # Ensure we have valid defaults
     return {
         "quality_score": float(parsed.get("quality_score", 80.0)),

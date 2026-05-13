@@ -74,19 +74,7 @@ const Dashboard = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {hasNoConnectors && (
-        <Alert
-          severity="info"
-          sx={{ mb: 2 }}
-          action={
-            <Button color="inherit" size="small" onClick={() => navigate('/connectors')}>
-              Add Connector
-            </Button>
-          }
-        >
-          <strong>No connectors configured yet.</strong> Add a connector to start monitoring your data sources.
-        </Alert>
-      )}
+
 
       {/* Stat Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -94,7 +82,7 @@ const Dashboard = () => {
           <StatCard icon={<HubIcon />} label="Total Connectors" value={cards.total_connectors} color="#2563eb" />
         </Grid>
         <Grid item xs={12} sm={6} md={4} lg={2}>
-          <StatCard icon={<CheckCircleIcon />} label="Healthy Connectors" value={cards.healthy_connectors} color="#16a34a" />
+          <StatCard icon={<CheckCircleIcon />} label="Connected Connectors" value={cards.healthy_connectors} color="#16a34a" />
         </Grid>
         <Grid item xs={12} sm={6} md={4} lg={2}>
           <StatCard icon={<StorageIcon />} label="Datasets" value={cards.dataset_count} color="#0891b2" />
@@ -240,7 +228,7 @@ const Dashboard = () => {
                             <Chip
                               label={c.status}
                               size="small"
-                              color={c.status === 'healthy' ? 'success' : c.status === 'unhealthy' || c.status === 'failed' ? 'error' : 'default'}
+                              color={c.status === 'Connected' ? 'success' : c.status === 'Connection Failed' ? 'error' : 'default'}
                             />
                           </TableCell>
                           <TableCell>

@@ -33,14 +33,11 @@ const Monitoring = () => {
   const [formError, setFormError] = useState(null);
 
   useEffect(() => {
-    dispatch(fetchConnectors());
-    dispatch(fetchJobs());
-    dispatch(fetchRuns(50));
+    // API calls removed
   }, [dispatch]);
 
   const refresh = () => {
-    dispatch(fetchJobs());
-    dispatch(fetchRuns(50));
+    // API calls removed
   };
 
   const openDialog = () => {
@@ -55,27 +52,17 @@ const Monitoring = () => {
       setFormError('Connector is required');
       return;
     }
-    const res = await dispatch(createJob({
-      connector_id: Number(form.connector_id),
-      job_type: form.job_type,
-      interval_minutes: Number(form.interval_minutes),
-      enabled: form.enabled,
-    }));
-    if (createJob.fulfilled.match(res)) {
-      setDialogOpen(false);
-      dispatch(fetchJobs());
-    } else {
-      setFormError(res.payload || 'Failed to create job');
-    }
+    // API calls removed
+    setDialogOpen(false);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this monitoring job?')) return;
-    await dispatch(deleteJob(id));
+    // API calls removed
   };
 
   const handleTriggerScan = async (connectorId) => {
-    await dispatch(scanConnector(connectorId));
+    // API calls removed
     refresh();
   };
 
