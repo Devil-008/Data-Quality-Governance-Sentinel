@@ -15,7 +15,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import StorageIcon from '@mui/icons-material/Storage';
 import CloudIcon from '@mui/icons-material/Cloud';
 import DataObjectIcon from '@mui/icons-material/DataObject';
-import LoginDialog from '../../components/LoginDialog';
+import Login from '../Login/Login';
 
 const features = [
     {
@@ -325,7 +325,7 @@ const Landing = () => {
                 </Container>
             </Box>
 
-            <LoginDialog
+            <Login
                 open={loginOpen}
                 onClose={closeLogin}
                 onSuccess={handleLoginSuccess}
