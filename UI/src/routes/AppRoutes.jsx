@@ -14,6 +14,7 @@ import Alerts from '../pages/Alerts/Alerts';
 import Notifications from '../pages/Notifications/Notifications';
 import Settings from '../pages/Settings/Settings';
 import RuleBooks from '../pages/RuleBooks/RuleBooks';
+import DataQualityHistory from '../pages/DataQualityHistory/DataQualityHistory';
 
 const AppRoutes = () => {
   return (
@@ -32,6 +33,7 @@ const AppRoutes = () => {
         <Route path="/datasets" element={<Datasets />} />
         <Route path="/rule-books" element={<RuleBooks />} />
         <Route path="/monitoring" element={<Monitoring />} />
+        <Route path="/data-quality-history" element={<DataQualityHistory />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/settings" element={<Settings />} />

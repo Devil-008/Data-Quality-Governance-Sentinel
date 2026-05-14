@@ -261,7 +261,7 @@ const Dashboard = () => {
                         <TableCell><strong>Type</strong></TableCell>
                         <TableCell><strong>Target</strong></TableCell>
                         <TableCell><strong>Status</strong></TableCell>
-                        <TableCell><strong>When</strong></TableCell>
+                        <TableCell><strong>Timestamp</strong></TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
