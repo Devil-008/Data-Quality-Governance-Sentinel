@@ -12,13 +12,18 @@ import {
   Typography,
   IconButton,
   Tooltip,
+  TableSortLabel,
 } from "@mui/material";
 import StorageIcon from "@mui/icons-material/Storage";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import LightbulbIcon from "@mui/icons-material/Lightbulb";
 
-const DatasetTable = ({ datasets = [], onRowClick }) => {
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+
+const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
   if (!datasets || datasets.length === 0) {
     return (
       <Box sx={{ p: 4, textAlign: "center" }}>
@@ -38,12 +43,24 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
     >
       <Table size="small">
         <TableHead>
-          <TableRow>
+          <TableRow sx={{ bgcolor: "grey.100" }}>
             <TableCell>
               <strong>Name</strong>
             </TableCell>
-            <TableCell>
-              <strong>Connector</strong>
+            <TableCell
+              onClick={() => onSort && onSort("connector_name")}
+              sx={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <strong>Connector</strong>
+                {sortConfig?.key !== "connector_name" ? (
+                  <UnfoldMoreIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                ) : sortConfig.direction === "asc" ? (
+                  <KeyboardArrowUpIcon fontSize="small" color="primary" />
+                ) : (
+                  <KeyboardArrowDownIcon fontSize="small" color="primary" />
+                )}
+              </Box>
             </TableCell>
             <TableCell>
               <strong>Schema</strong>
@@ -56,9 +73,6 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
             </TableCell>
             <TableCell>
               <strong>Confident (%)</strong>
-            </TableCell>
-            <TableCell>
-              <strong>Quality</strong>
             </TableCell>
             <TableCell>
               <strong>PII</strong>
@@ -95,21 +109,7 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
               </TableCell>
               <TableCell>{d.outlier_count != null ? d.outlier_count : "-"}</TableCell>
               <TableCell>{d.confidence_score != null ? `${d.confidence_score}` : "-"}</TableCell>
-              <TableCell>
-                {d.quality_score != null ? (
-                  <Chip
-                    label={`${d.quality_score}%`}
-                    size="small"
-                    color={
-                      d.quality_score >= 90
-                        ? "success"
-                        : d.quality_score >= 70
-                          ? "warning"
-                          : "error"
-                    }
-                  />
-                ) : null}
-              </TableCell>
+
               <TableCell>
                 {d.pii_percentage != null ? (
                   d.pii_percentage > 0 ? (
