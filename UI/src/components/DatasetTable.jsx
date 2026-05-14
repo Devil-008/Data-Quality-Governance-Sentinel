@@ -49,12 +49,19 @@ const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
             </TableCell>
             <TableCell
               onClick={() => onSort && onSort("connector_name")}
-              sx={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
+              sx={{
+                cursor: "pointer",
+                userSelect: "none",
+                whiteSpace: "nowrap",
+              }}
             >
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <strong>Connector</strong>
                 {sortConfig?.key !== "connector_name" ? (
-                  <UnfoldMoreIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                  <UnfoldMoreIcon
+                    fontSize="small"
+                    sx={{ color: "text.disabled" }}
+                  />
                 ) : sortConfig.direction === "asc" ? (
                   <KeyboardArrowUpIcon fontSize="small" color="primary" />
                 ) : (
@@ -69,7 +76,7 @@ const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
               <strong>Type</strong>
             </TableCell>
             <TableCell>
-              <strong>Outliner</strong>
+              <strong>Outlier</strong>
             </TableCell>
             <TableCell>
               <strong>Confident (%)</strong>
@@ -87,7 +94,10 @@ const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
             <TableRow
               key={d.id}
               hover
-              sx={{ cursor: onRowClick ? "pointer" : "default", borderBottom: "1px solid secondary.main" }}
+              sx={{
+                cursor: onRowClick ? "pointer" : "default",
+                borderBottom: "1px solid secondary.main",
+              }}
             >
               <TableCell>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -107,13 +117,65 @@ const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
                   variant="outlined"
                 />
               </TableCell>
-              <TableCell>{d.outlier_count != null ? d.outlier_count : "-"}</TableCell>
-              <TableCell>{d.confidence_score != null ? `${d.confidence_score}` : "-"}</TableCell>
+              {/* <TableCell>{d.outlier_count != null ? d.outlier_count : "-"}</TableCell> */}
+              <TableCell>
+                {d.outlier_count != null ? (
+                  <Box sx={{ minWidth: 120 }}>
+                    {/* <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: 700,
+                        color:
+                          d.outlier_count > 80
+                            ? "error.main"
+                            : d.outlier_count > 40
+                              ? "warning.main"
+                              : "success.main",
+                      }}
+                    >
+                      {d.outlier_count}
+                    </Typography> */}
+
+                    <Box
+                      sx={{
+                        mt: 0.5,
+                        height: 6,
+                        borderRadius: 5,
+                        bgcolor: "action.hover",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: `${Math.min(d.outlier_count, 100)}%`,
+                          height: "100%",
+                          borderRadius: 5,
+                          bgcolor:
+                            d.outlier_count > 80
+                              ? "error.main"
+                              : d.outlier_count > 40
+                                ? "warning.main"
+                                : "success.main",
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                ) : (
+                  "-"
+                )}
+              </TableCell>
+              <TableCell>
+                {d.confidence_score != null ? `${d.confidence_score}` : "-"}
+              </TableCell>
 
               <TableCell>
                 {d.pii_percentage != null ? (
                   d.pii_percentage > 0 ? (
-                    <Chip label={`PII (${d.pii_percentage}%)`} size="small" color="error" />
+                    <Chip
+                      label={`PII (${d.pii_percentage}%)`}
+                      size="small"
+                      color="error"
+                    />
                   ) : (
                     <Chip label="None" size="small" variant="outlined" />
                   )

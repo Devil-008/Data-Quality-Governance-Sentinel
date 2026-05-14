@@ -256,14 +256,14 @@ const Datasets = () => {
                     spacing={1}
                     sx={{ mt: 1, flexWrap: "wrap", gap: 1 }}
                   >
-                    {/* <Chip
-                      label={`Rows: ${profile.dataset.row_count != null && profile.dataset.row_count >= 0 ? profile.dataset.row_count : "-"}`}
+                    <Chip
+                      label={`Rows: ${profile.dataset.row_count != null && profile.dataset.row_count >= 0 ? profile.dataset.row_count : 0}`}
                       size="small"
                     />
                     <Chip
                       label={`Columns: ${profile.dataset.column_count ?? (profile.columns?.length || 0)}`}
                       size="small"
-                    /> */}
+                    />
                     {profile.dataset.quality_score != null && (
                       <Chip
                         label={`Quality: ${profile.dataset.quality_score}%`}
