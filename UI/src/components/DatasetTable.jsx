@@ -51,8 +51,12 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
             <TableCell>
               <strong>Type</strong>
             </TableCell>
-            {/* <TableCell><strong>Columns</strong></TableCell>
-            <TableCell><strong>Row Count</strong></TableCell> */}
+            <TableCell>
+              <strong>Outliner</strong>
+            </TableCell>
+            <TableCell>
+              <strong>Confident (%)</strong>
+            </TableCell>
             <TableCell>
               <strong>Quality</strong>
             </TableCell>
@@ -60,7 +64,7 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
               <strong>PII</strong>
             </TableCell>
             <TableCell align="right">
-              <strong>View</strong>
+              <strong>Deep Thinking</strong>
             </TableCell>
           </TableRow>
         </TableHead>
@@ -69,7 +73,7 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
             <TableRow
               key={d.id}
               hover
-              sx={{ cursor: onRowClick ? "pointer" : "default" }}
+              sx={{ cursor: onRowClick ? "pointer" : "default", borderBottom: "1px solid secondary.main" }}
             >
               <TableCell>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -89,8 +93,8 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
                   variant="outlined"
                 />
               </TableCell>
-              {/* <TableCell>{d.column_count ?? '-'}</TableCell>
-              <TableCell>{d.row_count != null && d.row_count >= 0 ? d.row_count : '-'}</TableCell> */}
+              <TableCell>{"-"}</TableCell>
+              <TableCell>{"-"}</TableCell>
               <TableCell>
                 {d.quality_score != null ? (
                   <Chip
@@ -119,13 +123,8 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
                     size="small"
                     onClick={() => onRowClick && onRowClick(d)}
                   >
-                    <OpenInNewIcon fontSize="small" />
-                    <PsychologyIcon
-                      fontSize="small"
-                      sx={{
-                        color: "#8b5cf6",
-                      }}
-                    />
+                    {/* <OpenInNewIcon fontSize="small" />
+                    <PsychologyIcon fontSize="small" /> */}
                     <LightbulbIcon
                       fontSize="small"
                       sx={{

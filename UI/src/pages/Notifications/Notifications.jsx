@@ -45,10 +45,10 @@ const Notifications = () => {
           {unread > 0 && <Chip label={`${unread} unread`} color="error" size="small" />}
         </Stack>
         <Stack direction="row" spacing={1}>
-          <Button startIcon={<RefreshIcon />} onClick={refresh} variant="outlined">Refresh</Button>
           <Button startIcon={<DoneAllIcon />} onClick={handleMarkAll} variant="contained" disabled={unread === 0}>
             Mark All Read
           </Button>
+          <Button startIcon={<RefreshIcon />} onClick={refresh} variant="outlined"></Button>
         </Stack>
       </Stack>
 
