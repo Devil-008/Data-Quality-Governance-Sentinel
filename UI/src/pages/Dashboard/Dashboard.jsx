@@ -157,7 +157,7 @@ const Dashboard = () => {
         <Grid item xs={12} sm={6} md={4} lg={2}>
           <StatCard
             icon={<CheckCircleIcon />}
-            label="Healthy Connectors"
+            label="Connected Connectors"
             value={cards.healthy_connectors}
             color="#16a34a"
             textColor={(theme) =>
@@ -399,9 +399,9 @@ const Dashboard = () => {
                               label={c.status}
                               size="small"
                               color={
-                                c.status === "healthy"
+                                c.status === "Connected"
                                   ? "success"
-                                  : c.status === "unhealthy" ||
+                                  : c.status === "Connection Failed" ||
                                       c.status === "failed"
                                     ? "error"
                                     : "default"

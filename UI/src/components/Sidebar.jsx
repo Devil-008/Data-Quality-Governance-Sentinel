@@ -14,6 +14,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ShieldIcon from '@mui/icons-material/Shield';
+import DescriptionIcon from '@mui/icons-material/Description';
 import { logout } from '../redux/slices/authSlice';
 
 const drawerWidth = 240;
@@ -22,6 +23,7 @@ const items = [
   { label: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { label: 'Connectors', icon: <HubIcon />, path: '/connectors' },
   { label: 'Datasets', icon: <StorageIcon />, path: '/datasets' },
+  { label: 'Rule Books', icon: <DescriptionIcon />, path: '/rule-books' },
   { label: 'Monitoring', icon: <MonitorHeartIcon />, path: '/monitoring' },
   { label: 'Alerts', icon: <NotificationsActiveIcon />, path: '/alerts' },
   { label: 'Notifications', icon: <NotificationsIcon />, path: '/notifications' },

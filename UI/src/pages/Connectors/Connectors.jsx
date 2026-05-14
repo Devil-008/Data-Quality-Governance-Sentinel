@@ -30,14 +30,17 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import PlayCircleIcon from "@mui/icons-material/PlayCircle";
 import WifiTetheringIcon from "@mui/icons-material/WifiTethering";
 import { useDispatch, useSelector } from "react-redux";
+import EditIcon from "@mui/icons-material/Edit";
+import { useNavigate } from "react-router-dom";
 import {
   fetchConnectors,
   createConnector,
   testConnection,
   scanConnector,
-  deleteConnector,
-  clearTestResult,
   clearScanResult,
+  deleteConnector,
+  updateConnector,
+  clearTestResult,
   testExistingConnector,
 } from "../../redux/slices/connectorSlice";
 import Loader from "../../components/Loader";
@@ -106,16 +109,22 @@ const TYPE_FIELDS = {
 
 const Connectors = () => {
   const dispatch = useDispatch();
-  const { list, loading, error, testResult, scanResult, testLoading } =
-    useSelector((s) => s.connectors);
+  const navigate = useNavigate();
+  const { list, loading, error, testResult, testLoading } = useSelector(
+    (s) => s.connectors,
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState("");
   const [type, setType] = useState("mysql");
   const [config, setConfig] = useState({});
   const [savingError, setSavingError] = useState(null);
   const [runningTest, setRunningTest] = useState({});
-  const [runningScan, setRunningScan] = useState({});
+  const [search, setSearch] = useState("");
+  const fields = TYPE_FIELDS[type] || [];
+  // const fields = TYPE_FIELDS[type] || [];
 
   useEffect(() => {
     dispatch(fetchConnectors());
@@ -126,14 +135,29 @@ const Connectors = () => {
     (TYPE_FIELDS[type] || []).forEach((f) => {
       if (f.defaultValue !== undefined) defaults[f.key] = f.defaultValue;
     });
-    setConfig(defaults);
+    if (!editMode) {
+      setConfig(defaults);
+    }
     dispatch(clearTestResult());
-  }, [type, dispatch]);
+  }, [type, dispatch, editMode]);
 
-  const openDialog = () => {
+  const openAddDialog = () => {
+    setEditMode(false);
+    setEditingId(null);
     setName("");
     setType("mysql");
     setConfig({});
+    setSavingError(null);
+    dispatch(clearTestResult());
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (connector) => {
+    setEditMode(true);
+    setEditingId(connector.id);
+    setName(connector.name);
+    setType(connector.type);
+    setConfig(connector.config || {});
     setSavingError(null);
     dispatch(clearTestResult());
     setDialogOpen(true);
@@ -150,6 +174,18 @@ const Connectors = () => {
     setSavingError(null);
     await dispatch(testConnection({ type, config }));
   };
+  const filteredConnectors = (list || []).filter((c) => {
+    const q = search.trim().toLowerCase();
+
+    return (
+      String(c.name || "")
+        .toLowerCase()
+        .includes(q) ||
+      String(c.type || "")
+        .toLowerCase()
+        .includes(q)
+    );
+  });
 
   const handleSave = async () => {
     setSavingError(null);
@@ -164,12 +200,29 @@ const Connectors = () => {
         return;
       }
     }
-    const res = await dispatch(createConnector({ name, type, config }));
-    if (createConnector.fulfilled.match(res)) {
+
+    let res;
+    if (editMode) {
+      res = await dispatch(
+        updateConnector({ id: editingId, name, type, config }),
+      );
+    } else {
+      res = await dispatch(createConnector({ name, type, config }));
+    }
+
+    if (
+      createConnector.fulfilled.match(res) ||
+      updateConnector.fulfilled.match(res)
+    ) {
       closeDialog();
       dispatch(fetchConnectors());
     } else {
-      setSavingError(res.payload || "Failed to create connector");
+      setSavingError(
+        res.payload ||
+          (editMode
+            ? "Failed to update connector"
+            : "Failed to create connector"),
+      );
     }
   };
 
@@ -177,13 +230,6 @@ const Connectors = () => {
     setRunningTest((s) => ({ ...s, [id]: true }));
     await dispatch(testExistingConnector(id));
     setRunningTest((s) => ({ ...s, [id]: false }));
-    dispatch(fetchConnectors());
-  };
-
-  const handleScan = async (id) => {
-    setRunningScan((s) => ({ ...s, [id]: true }));
-    await dispatch(scanConnector(id));
-    setRunningScan((s) => ({ ...s, [id]: false }));
     dispatch(fetchConnectors());
   };
 
@@ -196,8 +242,6 @@ const Connectors = () => {
     dispatch(fetchConnectors());
   };
 
-  const fields = TYPE_FIELDS[type] || [];
-
   return (
     <Box>
       <Stack
@@ -206,27 +250,30 @@ const Connectors = () => {
         alignItems="center"
         sx={{ mb: 3 }}
       >
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: 700, color: "text.primary" }}
-        >
+        <Typography variant="h5" sx={{ fontWeight: 700, color: "text.primary" }}>
           Connectors
         </Typography>
         <Stack direction="row" spacing={1}>
-          <Button
-            startIcon={<RefreshIcon />}
-            onClick={() => dispatch(fetchConnectors())}
-            variant="outlined"
-          >
-            Refresh
-          </Button>
+          <TextField
+            label="Search name or type"
+            size="small"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ flex: 1, maxWidth: 220 }}
+          />
+          
           <Button
             startIcon={<AddIcon />}
-            onClick={openDialog}
+            onClick={openAddDialog}
             variant="contained"
           >
             Add Connector
           </Button>
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={() => dispatch(fetchConnectors())}
+            variant="outlined"
+          ></Button>
         </Stack>
       </Stack>
 
@@ -275,93 +322,87 @@ const Connectors = () => {
                     <TableCell>
                       <strong>Last Tested</strong>
                     </TableCell>
-                    <TableCell>
-                      <strong>Last Scanned</strong>
-                    </TableCell>
                     <TableCell align="right">
                       <strong>Actions</strong>
                     </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {list.map((c) => (
-                    <TableRow key={c.id} hover>
-                      <TableCell sx={{ fontWeight: 500 }}>{c.name}</TableCell>
-                      <TableCell>
-                        <Chip label={c.type} size="small" variant="outlined" />
+                  {filteredConnectors.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        No connectors found
                       </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={c.status || "unknown"}
-                          size="small"
-                          color={
-                            c.status === "healthy"
-                              ? "success"
-                              : c.status === "unhealthy" ||
-                                  c.status === "failed"
-                                ? "error"
-                                : "default"
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption">
-                          {c.last_tested_at
-                            ? new Date(c.last_tested_at).toLocaleString()
-                            : "-"}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption">
-                          {c.last_scanned_at
-                            ? new Date(c.last_scanned_at).toLocaleString()
-                            : "-"}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Tooltip title="Test Connection">
-                          <span>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleTestExisting(c.id)}
-                              disabled={runningTest[c.id]}
-                            >
-                              {runningTest[c.id] ? (
-                                <CircularProgress size={16} />
-                              ) : (
-                                <WifiTetheringIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title="Run Scan">
-                          <span>
+                    </TableRow>
+                  ) : (
+                    filteredConnectors.map((c) => (
+                      <TableRow key={c.id} hover>
+                        <TableCell sx={{ fontWeight: 500 }}>{c.name}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={c.type}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={c.status || "unknown"}
+                            size="small"
+                            color={
+                              c.status === "Connected"
+                                ? "success"
+                                : c.status === "Connection Failed"
+                                  ? "error"
+                                  : "default"
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption">
+                            {c.last_tested_at
+                              ? new Date(c.last_tested_at).toLocaleString()
+                              : "-"}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Test Connection">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleTestExisting(c.id)}
+                                disabled={runningTest[c.id]}
+                              >
+                                {runningTest[c.id] ? (
+                                  <CircularProgress size={16} />
+                                ) : (
+                                  <WifiTetheringIcon fontSize="small" />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title="Edit">
                             <IconButton
                               size="small"
                               color="primary"
-                              onClick={() => handleScan(c.id)}
-                              disabled={runningScan[c.id]}
+                              onClick={() => openEditDialog(c)}
                             >
-                              {runningScan[c.id] ? (
-                                <CircularProgress size={16} />
-                              ) : (
-                                <PlayCircleIcon fontSize="small" />
-                              )}
+                              <EditIcon fontSize="small" />
                             </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleDelete(c.id)}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleDelete(c.id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </Paper>
@@ -370,7 +411,9 @@ const Connectors = () => {
       </Card>
 
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Connector</DialogTitle>
+        <DialogTitle>
+          {editMode ? "Edit Connector" : "Add Connector"}
+        </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {savingError && <Alert severity="error">{savingError}</Alert>}

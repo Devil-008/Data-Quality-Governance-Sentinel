@@ -3,9 +3,17 @@ import api from '../../api/axios'
 
 export const fetchDatasets = createAsyncThunk(
   'datasets/list',
-  async (params = {}) => {
-    const res = await api.get('/api/datasets/list', { params })
-    return res.data
+  async (params = {}, { rejectWithValue, getState }) => {
+    const { datasets } = getState()
+    if (datasets.list.length > 0 && !datasets.loading && Object.keys(params).length === 0) {
+      return datasets.list
+    }
+    try {
+      const res = await api.get('/api/datasets/list', { params })
+      return res.data
+    } catch (e) {
+      return rejectWithValue(e.response?.data?.detail || 'Failed to load datasets')
+    }
   },
 )
 

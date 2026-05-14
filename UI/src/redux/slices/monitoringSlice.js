@@ -1,15 +1,37 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../api/axios';
 
-export const fetchJobs = createAsyncThunk('monitoring/jobs', async () => {
-  const res = await api.get('/api/monitoring/jobs');
-  return res.data;
-});
+export const fetchJobs = createAsyncThunk(
+  'monitoring/jobs',
+  async (_, { rejectWithValue, getState }) => {
+    const { monitoring } = getState()
+    if (monitoring.jobs.length > 0 && !monitoring.loading) {
+      return monitoring.jobs
+    }
+    try {
+      const res = await api.get('/api/monitoring/jobs')
+      return res.data
+    } catch (e) {
+      return rejectWithValue(e.response?.data?.detail || 'Failed to load jobs')
+    }
+  },
+)
 
-export const fetchRuns = createAsyncThunk('monitoring/runs', async (limit = 50) => {
-  const res = await api.get('/api/monitoring/runs', { params: { limit } });
-  return res.data;
-});
+export const fetchRuns = createAsyncThunk(
+  'monitoring/runs',
+  async (limit = 50, { rejectWithValue, getState }) => {
+    const { monitoring } = getState()
+    if (monitoring.runs.length > 0) {
+      return monitoring.runs
+    }
+    try {
+      const res = await api.get('/api/monitoring/runs', { params: { limit } })
+      return res.data
+    } catch (e) {
+      return rejectWithValue(e.response?.data?.detail || 'Failed to load runs')
+    }
+  },
+)
 
 export const createJob = createAsyncThunk(
   'monitoring/createJob',

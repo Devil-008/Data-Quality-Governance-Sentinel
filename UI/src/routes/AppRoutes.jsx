@@ -13,6 +13,7 @@ import Monitoring from '../pages/Monitoring/Monitoring';
 import Alerts from '../pages/Alerts/Alerts';
 import Notifications from '../pages/Notifications/Notifications';
 import Settings from '../pages/Settings/Settings';
+import RuleBooks from '../pages/RuleBooks/RuleBooks';
 
 const AppRoutes = () => {
   return (
@@ -30,6 +31,7 @@ const AppRoutes = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/connectors" element={<Connectors />} />
         <Route path="/datasets" element={<Datasets />} />
+        <Route path="/rule-books" element={<RuleBooks />} />
         <Route path="/monitoring" element={<Monitoring />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/notifications" element={<Notifications />} />

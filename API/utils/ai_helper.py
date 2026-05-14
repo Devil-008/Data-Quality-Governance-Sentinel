@@ -3,10 +3,11 @@
 Used by the monitoring/alerts pipeline and by the AI controller. Never invents
 data — caller passes real metrics in, the model produces analysis only.
 """
+
 import os
 import json
 import requests
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
 from utils.common import logger
@@ -21,7 +22,7 @@ MISTRAL_API_URL = os.getenv(
 )
 
 
-def _chat(system: str, user: str, timeout: int = 30) -> str:
+def _chat(system: str, user: str, timeout: int = 60, max_tokens: int = 2000) -> str:
     """Send a chat completion to Mistral and return assistant text."""
     if not MISTRAL_API_KEY:
         return ""
@@ -38,16 +39,23 @@ def _chat(system: str, user: str, timeout: int = 30) -> str:
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                "temperature": 0.2,
-                "max_tokens": 700,
+                "temperature": 0.1,
+                "max_tokens": max_tokens,
             },
             timeout=timeout,
         )
         if resp.status_code != 200:
-            logger.warning("Mistral API non-200: %s %s", resp.status_code, resp.text[:200])
+            logger.warning(
+                "Mistral API non-200: %s %s", resp.status_code, resp.text[:200]
+            )
             return ""
         data = resp.json()
-        return (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
+        return (
+            (data.get("choices") or [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
     except Exception as e:
         logger.error("Mistral call failed: %s", e)
         return ""
@@ -77,7 +85,7 @@ def _parse_json_block(text: str) -> Dict[str, Any]:
         start, end = text.find("{"), text.rfind("}")
         if start >= 0 and end > start:
             try:
-                return json.loads(text[start:end + 1])
+                return json.loads(text[start : end + 1])
             except Exception:
                 return {"summary": text}
         return {"summary": text}
@@ -90,6 +98,19 @@ SYSTEM_PROMPT = (
     'with keys: "summary", "root_cause", "impact", "recommendation". '
     "Each value must be a short paragraph (<= 60 words)."
 )
+
+
+QUALITY_VALIDATION_SYSTEM_PROMPT = """You are an expert data quality engineer. Your task is to validate dataset quality using the provided Rule Books.
+
+Respond ONLY with a JSON object containing:
+- "quality_score": number 0-100
+- "issues": array of strings describing quality issues found
+- "pii_columns": array of column names containing PII/sensitive data
+- "pii_categories": array of PII categories detected (e.g., "email", "phone", "aadhaar")
+- "anomalies": array of anomaly descriptions
+- "recommendations": array of improvement recommendations
+
+Be factual and use only the information provided. Do not invent data."""
 
 
 def analyze_issue(payload: Dict[str, Any]) -> Dict[str, str]:
@@ -116,6 +137,68 @@ def analyze_issue(payload: Dict[str, Any]) -> Dict[str, str]:
         "root_cause": parsed.get("root_cause", "")[:1000],
         "impact": parsed.get("impact", "")[:1000],
         "recommendation": parsed.get("recommendation", "")[:1000],
+    }
+
+
+def validate_dataset_quality(
+    dataset_metadata: Dict[str, Any],
+    schema: List[Dict[str, Any]],
+    sample_rows: Optional[List[Dict[str, Any]]] = None,
+    rule_chunks: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Validate dataset quality using LLM and provided Rule Books."""
+    if not MISTRAL_API_KEY:
+        logger.warning("AI quality validation disabled: no MISTRAL_API_KEY")
+        return {
+            "quality_score": 80.0,
+            "issues": ["AI validation disabled"],
+            "pii_columns": [],
+            "pii_categories": [],
+            "anomalies": [],
+            "recommendations": ["Enable AI for comprehensive quality checks"],
+        }
+
+    # Check if rule books exist
+    if not rule_chunks:
+        logger.warning(
+            "No rule books found in ChromaDB for dataset %d", dataset_metadata.get("id")
+        )
+
+    user_input = {
+        "dataset_metadata": dataset_metadata,
+        "schema": schema,
+        "sample_rows": sample_rows or [],
+        "rule_books": rule_chunks or [],
+    }
+
+    user_msg = f"""Validate the quality of this dataset using the provided Rule Books.
+
+DATASET INFORMATION:
+{json.dumps(user_input, default=str, indent=2)}
+
+Respond with JSON only as specified."""
+
+    text = _chat(
+        QUALITY_VALIDATION_SYSTEM_PROMPT, user_msg, timeout=90, max_tokens=3000
+    )
+    parsed = _parse_json_block(text)
+
+    logger.debug(
+        "LLM validation result: dataset=%d, score=%s, issues=%s, pii=%s",
+        dataset_metadata.get("id"),
+        parsed.get("quality_score"),
+        parsed.get("issues"),
+        parsed.get("pii_categories"),
+    )
+
+    # Ensure we have valid defaults
+    return {
+        "quality_score": float(parsed.get("quality_score", 80.0)),
+        "issues": parsed.get("issues", []),
+        "pii_columns": parsed.get("pii_columns", []),
+        "pii_categories": parsed.get("pii_categories", []),
+        "anomalies": parsed.get("anomalies", []),
+        "recommendations": parsed.get("recommendations", []),
     }
 
 

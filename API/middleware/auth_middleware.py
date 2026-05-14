@@ -13,6 +13,7 @@ def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)) ->
     try:
         payload = decode_token(creds.credentials)
         return {
+            "id": payload.get("user_id"),
             "user_id": payload.get("user_id"),
             "username": payload.get("username"),
             "role": payload.get("role"),
