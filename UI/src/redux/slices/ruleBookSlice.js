@@ -5,7 +5,7 @@ export const fetchRuleBooks = createAsyncThunk(
   "ruleBooks/list",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get("/api/rule-books/list");
+      const res = await api.get("/api/rule-books");
       return res.data;
     } catch (e) {
       return rejectWithValue(

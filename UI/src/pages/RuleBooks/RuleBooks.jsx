@@ -322,7 +322,7 @@ const RuleBooks = () => {
                       <TableCell sx={{ fontWeight: 500 }}>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <DescriptionIcon fontSize="small" color="primary" />
-                          {rb.name}
+                          {rb.rulebook_name || rb.name}
                         </Stack>
                       </TableCell>
                       <TableCell>
@@ -497,34 +497,23 @@ const RuleBooks = () => {
               <CloseIcon />
             </IconButton>
           </Stack>
-          {selectedRuleBookLoading ? (
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                minHeight: 300,
-              }}
-            >
-              <CircularProgress />
-            </Box>
-          ) : reduxSelectedRuleBook ? (
+          {selectedRuleBook ? (
             <Stack spacing={2}>
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Name
+                  Rule Book Name
                 </Typography>
                 <Typography variant="body2">
-                  {reduxSelectedRuleBook.name}
+                  {selectedRuleBook.rulebook_name}
                 </Typography>
               </Box>
 
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Filename
+                  Connector Type
                 </Typography>
                 <Typography variant="body2">
-                  {reduxSelectedRuleBook.filename}
+                  {selectedRuleBook.connector_type || "-"}
                 </Typography>
               </Box>
 
@@ -533,9 +522,9 @@ const RuleBooks = () => {
                   Created
                 </Typography>
                 <Typography variant="body2">
-                  {reduxSelectedRuleBook.created_at
+                  {selectedRuleBook.created_at
                     ? new Date(
-                        reduxSelectedRuleBook.created_at,
+                        selectedRuleBook.created_at,
                       ).toLocaleString()
                     : "-"}
                 </Typography>
@@ -562,7 +551,7 @@ const RuleBooks = () => {
                       fontSize: "0.85rem",
                     }}
                   >
-                    {reduxSelectedRuleBook.content || "No content"}
+                    {selectedRuleBook.rulebook_content || "No content"}
                   </Typography>
                 </Paper>
               </Box>

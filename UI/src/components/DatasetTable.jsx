@@ -93,8 +93,8 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
                   variant="outlined"
                 />
               </TableCell>
-              <TableCell>{"-"}</TableCell>
-              <TableCell>{"-"}</TableCell>
+              <TableCell>{d.outlier_count != null ? d.outlier_count : "-"}</TableCell>
+              <TableCell>{d.confidence_score != null ? `${d.confidence_score}` : "-"}</TableCell>
               <TableCell>
                 {d.quality_score != null ? (
                   <Chip
@@ -111,7 +111,13 @@ const DatasetTable = ({ datasets = [], onRowClick }) => {
                 ) : null}
               </TableCell>
               <TableCell>
-                {d.contains_pii === true ? (
+                {d.pii_percentage != null ? (
+                  d.pii_percentage > 0 ? (
+                    <Chip label={`PII (${d.pii_percentage}%)`} size="small" color="error" />
+                  ) : (
+                    <Chip label="None" size="small" variant="outlined" />
+                  )
+                ) : d.contains_pii === true ? (
                   <Chip label="PII" size="small" color="error" />
                 ) : d.contains_pii === false ? (
                   <Chip label="None" size="small" variant="outlined" />
