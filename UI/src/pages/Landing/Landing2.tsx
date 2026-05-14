@@ -29,7 +29,7 @@ const AGENTS = [
   { name: 'AutoRemediator',   role: 'applies safe fixes; escalates risky ones',    icon: Brain },
 ];
 
-export default function Landing() {
+export default function Landing2() {
   const navigate = useNavigate();
   const { token } = useSelector((state: any) => state.auth);
 

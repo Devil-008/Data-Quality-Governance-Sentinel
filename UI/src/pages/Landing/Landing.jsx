@@ -15,7 +15,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import StorageIcon from '@mui/icons-material/Storage';
 import CloudIcon from '@mui/icons-material/Cloud';
 import DataObjectIcon from '@mui/icons-material/DataObject';
-import LoginDialog from '../../components/LoginDialog';
+// import LoginDialog from '../../components/LoginDialog';
 
 const features = [
     {
@@ -325,11 +325,11 @@ const Landing = () => {
                 </Container>
             </Box>
 
-            <LoginDialog
+            {/* <LoginDialog
                 open={loginOpen}
                 onClose={closeLogin}
                 onSuccess={handleLoginSuccess}
-            />
+            /> */}
 
             {/* Footer */}
             <Box sx={{ py: 4, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>

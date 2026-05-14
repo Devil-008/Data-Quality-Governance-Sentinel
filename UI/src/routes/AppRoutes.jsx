@@ -1,24 +1,26 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 
-import ProtectedRoute from '../components/ProtectedRoute';
-import Layout from '../components/Layout';
-import Landing from '../pages/Landing/Landing';
-import Login from '../pages/Login/Login';
+import ProtectedRoute from "../components/ProtectedRoute";
+import Layout from "../components/Layout";
+import Landing from "../pages/Landing/Landing";
+import Login from "../pages/Login/Login";
 // import Login2 from '../pages/Login/Login2';
-import Dashboard from '../pages/Dashboard/Dashboard';
-import Connectors from '../pages/Connectors/Connectors';
-import Datasets from '../pages/Datasets/Datasets';
-import Monitoring from '../pages/Monitoring/Monitoring';
-import Alerts from '../pages/Alerts/Alerts';
-import Notifications from '../pages/Notifications/Notifications';
-import Settings from '../pages/Settings/Settings';
-import RuleBooks from '../pages/RuleBooks/RuleBooks';
+import Dashboard from "../pages/Dashboard/Dashboard";
+import Connectors from "../pages/Connectors/Connectors";
+import Datasets from "../pages/Datasets/Datasets";
+import Monitoring from "../pages/Monitoring/Monitoring";
+import Alerts from "../pages/Alerts/Alerts";
+import Notifications from "../pages/Notifications/Notifications";
+import Settings from "../pages/Settings/Settings";
+import RuleBooks from "../pages/RuleBooks/RuleBooks";
+import Landing2 from "../pages/Landing/Landing2";
 
 const AppRoutes = () => {
   return (
     <Routes>
- <Route path="/" element={<Landing />} />
+      <Route path="/" element={<Landing2 />} />
+      {/* <Route path="/" element={<Landing />} /> */}
       {/* <Route path="/login" element={<Login2 />} /> */}
       <Route path="/login" element={<Login />} />
       <Route
