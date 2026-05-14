@@ -139,6 +139,23 @@ const Datasets = () => {
             onChange={(e) => handleFilterChange("q", e.target.value)}
             sx={{ flex: 1, maxWidth: 200 }}
           />
+          <TextField
+            select
+            label="Connector"
+            size="small"
+            value={filters.connector_id}
+            onChange={(e) =>
+              handleFilterChange("connector_id", e.target.value)
+            }
+            sx={{ minWidth: 200 }}
+          >
+            <MenuItem value="">All</MenuItem>
+            {connectors.map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.name} ({c.type})
+              </MenuItem>
+            ))}
+          </TextField>
           <Button
             startIcon={<RefreshIcon />}
             onClick={() => applyFilters(filters)}
@@ -147,30 +164,14 @@ const Datasets = () => {
         </Stack>
       </Stack>
 
-      <Card sx={{ mb: 2 }}>
+      {/* <Card sx={{ mb: 2 }}>
         <CardContent>
           <Stack
             direction={{ xs: "column", md: "row" }}
             spacing={2}
             alignItems={{ md: "center" }}
-          >
-            <TextField
-              select
-              label="Connector"
-              size="small"
-              value={filters.connector_id}
-              onChange={(e) =>
-                handleFilterChange("connector_id", e.target.value)
-              }
-              sx={{ minWidth: 200 }}
-            >
-              <MenuItem value="">All</MenuItem>
-              {connectors.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name} ({c.type})
-                </MenuItem>
-              ))}
-            </TextField>
+          > */}
+
             {/* <TextField
               label="Search"
               size="small"
@@ -178,9 +179,9 @@ const Datasets = () => {
               onChange={(e) => handleFilterChange('q', e.target.value)}
               sx={{ flex: 1, minWidth: 200 }}
             /> */}
-          </Stack>
+          {/* </Stack>
         </CardContent>
-      </Card>
+      </Card> */}
 
       <Card>
         <CardContent>
