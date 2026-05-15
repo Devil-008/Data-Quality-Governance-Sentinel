@@ -184,7 +184,7 @@ const Datasets = () => {
           </TextField> */}
           <Button
             startIcon={<RefreshIcon />}
-            onClick={() => applyFilters(filters)}
+            onClick={() => dispatch(fetchDatasets(filters))}
             variant="outlined"
           ></Button>
         </Stack>
@@ -293,18 +293,23 @@ const Datasets = () => {
               </Card>
 
               {(() => {
+                const llm = profile.llm_report;
+                const python = profile.python_result;
+
+                // Fallback for older data structure if needed
                 let aiAnalysis = null;
-                if (profile.dataset.ai_analysis_json) {
+                if (!llm && !python && profile.dataset.ai_analysis_json) {
                   try {
                     aiAnalysis = JSON.parse(profile.dataset.ai_analysis_json);
                   } catch (e) {
                     console.error("Failed to parse ai_analysis_json", e);
                   }
                 }
-                const llm = aiAnalysis?.llm;
-                const python = aiAnalysis?.python;
+                
+                const finalLlm = llm || aiAnalysis?.llm;
+                const finalPython = python || aiAnalysis?.python;
 
-                if (!llm && !python) {
+                if (!finalLlm && !finalPython) {
                   return (
                     <Card variant="outlined" sx={{ mb: 3, bgcolor: "#f8f9fa" }}>
                       <CardContent>
@@ -343,13 +348,51 @@ const Datasets = () => {
                       >
                         <span role="img" aria-label="sparkles">✨</span>Analysis Summary
                       </Typography>
+
+                      {(() => {
+                        const getScoreColor = (val) => {
+                          if (val === 0) return "#2e7d32"; // Green
+                          if (val <= 30) return "#ed6c02"; // Amber
+                          return "#d32f2f"; // Red
+                        };
+
+                        const outliers = finalPython?.outliers_count ?? 0;
+                        const confidence = finalPython?.confidence_score ?? 0;
+                        // The user said "confident", assuming it might be confidence_score or similar
+                        
+                        return (
+                          <Box sx={{ mb: 3 }}>
+                            <Box sx={{ mb: 2 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: getScoreColor(outliers) }}>
+                                  Outliers: {outliers === 0 ? "Not Available" : outliers}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ height: 6, width: '100%', bgcolor: '#eee', borderRadius: 1, overflow: 'hidden' }}>
+                                <Box sx={{ height: '100%', width: `${Math.min(outliers, 100)}%`, bgcolor: getScoreColor(outliers), transition: 'width 0.5s ease' }} />
+                              </Box>
+                            </Box>
+
+                            <Box sx={{ mb: 2 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: getScoreColor(confidence) }}>
+                                  Confidence: {confidence}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ height: 6, width: '100%', bgcolor: '#eee', borderRadius: 1, overflow: 'hidden' }}>
+                                <Box sx={{ height: '100%', width: `${Math.min(confidence, 100)}%`, bgcolor: getScoreColor(confidence), transition: 'width 0.5s ease' }} />
+                              </Box>
+                            </Box>
+                          </Box>
+                        );
+                      })()}
                       
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
                           Contextual Summary
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {llm?.contextual_summary || "N/A"}
+                          {finalLlm?.contextual_summary || "N/A"}
                         </Typography>
                       </Box>
 
@@ -358,7 +401,16 @@ const Datasets = () => {
                           Technical Summary
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {llm?.technical_summary || "N/A"}
+                          {finalLlm?.technical_summary || "N/A"}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          PII Inspection
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {finalLlm?.pii_inspection || "N/A"}
                         </Typography>
                       </Box>
 
@@ -367,22 +419,22 @@ const Datasets = () => {
                           Differences
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {llm?.differences || "N/A"}
+                          {finalLlm?.differences || "N/A"}
                         </Typography>
                       </Box>
 
-                      {llm?.recommendations && llm.recommendations.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
+                      {finalLlm?.recommendations && finalLlm.recommendations.length > 0 && (
+                        <Box sx={{ mb: 0 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
                             Recommendations
                           </Typography>
-                          <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                            {llm.recommendations.map((rec, idx) => (
-                              <Typography component="li" variant="body2" color="text.secondary" key={idx}>
+                          <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "rgba(0, 0, 0, 0.6)" }}>
+                            {finalLlm.recommendations.map((rec, idx) => (
+                              <li key={idx} style={{ fontSize: "0.875rem", marginBottom: "4px" }}>
                                 {rec}
-                              </Typography>
+                              </li>
                             ))}
-                          </Box>
+                          </ul>
                         </Box>
                       )}
 

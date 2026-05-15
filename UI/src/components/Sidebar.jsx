@@ -39,7 +39,7 @@ const Sidebar = () => {
 
   const handleLogout = () => {
     dispatch(logout());
-    navigate('/login');
+    navigate('/');
   };
 
   return (
@@ -68,7 +68,9 @@ const Sidebar = () => {
       <Box sx={{ overflow: 'auto', flex: 1 }}>
         <List sx={{ px: 1 }}>
           {items.map((item) => {
-            const selected = location.pathname === item.path;
+            const selected = item.path === '/dashboard' 
+              ? (location.pathname === '/dashboard' || location.pathname === '/')
+              : location.pathname.startsWith(item.path);
             return (
               <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
                 <ListItemButton
