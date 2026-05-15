@@ -72,10 +72,7 @@ function PiiFlag({ pii }) {
 function TimelineNode({ run, isLast, groupDate }) {
   const [expanded, setExpanded] = useState(false);
   const theme = useTheme();
-  const sm = getStatusMeta(run.status);
-  const tm = getTypeMeta(run.run_type);
-  const hasAlert = run.quality_score != null && (run.quality_score < 50 || run.pii_percentage > 0);
-
+  // Parse metrics_json once
   const metrics = useMemo(() => {
     try {
       return run.metrics_json ? JSON.parse(run.metrics_json) : null;
@@ -85,8 +82,25 @@ function TimelineNode({ run, isLast, groupDate }) {
     }
   }, [run.metrics_json]);
 
-  const llm = metrics?.llm || metrics?.llm_report || {};
   const python = metrics?.python || {};
+  const llm = metrics?.llm || metrics?.llm_report || {};
+
+  // Derive actual status from python passed/failed metrics
+  const derivedStatus = useMemo(() => {
+    const passed = Number(python?.passed ?? 0);
+    const failed = Number(python?.failed ?? 0);
+
+    if (failed > 0) return 'failed';
+    if (passed > 0) return 'success';
+
+    // fallback to original backend status
+    return (run.status || 'success').toLowerCase();
+  }, [python, run.status]);
+
+  // Use derived status for badge and icon
+  const sm = getStatusMeta(derivedStatus);
+  const tm = getTypeMeta(run.run_type);
+  const hasAlert = run.quality_score != null && (run.quality_score < 50 || run.pii_percentage > 0);
 
   const hasData = (val) => {
     if (val === null || val === undefined || val === '') return false;
@@ -379,7 +393,24 @@ const DataQualityHistory = () => {
     return runs.filter((r) => {
       const matchConnector = !filterConnector || String(r.connector_id) === filterConnector;
       const matchType = !filterType || r.run_type === filterType;
-      const matchStatus = !filterStatus || r.status === filterStatus;
+      let derivedStatus = (r.status || 'success').toLowerCase();
+
+      try {
+        const metrics = r.metrics_json ? JSON.parse(r.metrics_json) : null;
+        const python = metrics?.python || {};
+
+        const passed = Number(python?.passed ?? 0);
+        const failed = Number(python?.failed ?? 0);
+
+        if (failed > 0) {
+          derivedStatus = 'failed';
+        } else if (passed > 0) {
+          derivedStatus = 'success';
+        }
+      } catch (e) {
+        // ignore parse errors and use original status
+      }
+      const matchStatus = !filterStatus || derivedStatus === filterStatus;
       
       const searchStr = searchTerm.toLowerCase();
       const matchSearch = !searchTerm || 
@@ -404,12 +435,50 @@ const DataQualityHistory = () => {
 
   // Stats
   const stats = useMemo(() => {
+    const getDerivedStatus = (r) => {
+      try {
+        const metrics = r.metrics_json ? JSON.parse(r.metrics_json) : null;
+        const python = metrics?.python || {};
+
+        const passed = Number(python?.passed ?? 0);
+        const failed = Number(python?.failed ?? 0);
+
+        if (failed > 0) return 'failed';
+        if (passed > 0) return 'success';
+
+        return (r.status || 'success').toLowerCase();
+      } catch {
+        return (r.status || 'success').toLowerCase();
+      }
+    };
+
     const total = filtered.length;
-    const success = filtered.filter(r => r.status?.toLowerCase() === 'success').length;
-    const failed = filtered.filter(r => r.status?.toLowerCase() === 'failed').length;
-    const pii = filtered.filter(r => r.pii_percentage > 0).length;
-    const lowQ = filtered.filter(r => r.quality_score != null && r.quality_score < 50).length;
-    return { total, success, failed, pii, lowQ };
+
+    const success = filtered.filter(
+      (r) => getDerivedStatus(r) === 'success'
+    ).length;
+
+    const failed = filtered.filter(
+      (r) => getDerivedStatus(r) === 'failed'
+    ).length;
+
+    const pii = filtered.filter(
+      (r) => r.pii_percentage > 0
+    ).length;
+
+    const lowQ = filtered.filter(
+      (r) =>
+        r.quality_score != null &&
+        r.quality_score < 50
+    ).length;
+
+    return {
+      total,
+      success,
+      failed,
+      pii,
+      lowQ,
+    };
   }, [filtered]);
 
   const activeFilters = [filterConnector, filterType, filterStatus].filter(Boolean).length;
