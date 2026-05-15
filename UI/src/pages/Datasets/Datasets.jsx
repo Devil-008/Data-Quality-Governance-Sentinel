@@ -17,6 +17,7 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  TableContainer,
   Paper,
   Alert,
   CircularProgress,
@@ -241,244 +242,164 @@ const Datasets = () => {
             <Loader label="Loading..." />
           ) : (
             <Box>
-              <Card variant="outlined" sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                    {profile.dataset.dataset_name}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {profile.dataset.connector_name} ·{" "}
-                    {profile.dataset.schema_name || "-"} ·{" "}
-                    {profile.dataset.dataset_type}
-                  </Typography>
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    sx={{ mt: 1, flexWrap: "wrap", gap: 1 }}
-                  >
-                    {/* <Chip
-                      label={`Rows: ${profile.dataset.row_count != null && profile.dataset.row_count >= 0 ? profile.dataset.row_count : "-"}`}
-                      size="small"
-                    />
-                    <Chip
-                      label={`Columns: ${profile.dataset.column_count ?? (profile.columns?.length || 0)}`}
-                      size="small"
-                    /> */}
-                    {profile.dataset.quality_score != null && (
-                      <Chip
-                        label={`Quality: ${profile.dataset.quality_score}%`}
-                        size="small"
-                        color={
-                          profile.dataset.quality_score >= 90
-                            ? "success"
-                            : profile.dataset.quality_score >= 70
-                              ? "warning"
-                              : "error"
-                        }
-                      />
-                    )}
-                    {profile.dataset.contains_pii ? (
-                      <Chip
-                        label={
-                          profile.dataset.pii_categories
-                            ? `PII: ${profile.dataset.pii_categories}`
-                            : "PII"
-                        }
-                        size="small"
-                        color="error"
-                      />
-                    ) : null}
-                  </Stack>
-                </CardContent>
-              </Card>
+              {/* Header Info */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: "primary.main" }}>
+                  {profile.dataset.dataset_name}
+                </Typography>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Source: {profile.dataset.connector_name} · Type: {profile.dataset.dataset_type}
+                </Typography>
+                <Typography variant="h6" sx={{ mt: 1, fontWeight: 700 }}>
+                  Data Quality Score: {profile.dataset.quality_score ?? 0}%
+                </Typography>
+              </Box>
 
               {(() => {
-                const llm = profile.llm_report;
-                const python = profile.python_result;
+                const llm = profile.llm_report || {};
+                const python = profile.python_result || {};
 
-                // Fallback for older data structure if needed
-                let aiAnalysis = null;
-                if (!llm && !python && profile.dataset.ai_analysis_json) {
-                  try {
-                    aiAnalysis = JSON.parse(profile.dataset.ai_analysis_json);
-                  } catch (e) {
-                    console.error("Failed to parse ai_analysis_json", e);
-                  }
-                }
-                
-                const finalLlm = llm || aiAnalysis?.llm;
-                const finalPython = python || aiAnalysis?.python;
+                const getBarColor = (pct) => {
+                  if (pct == null) return "grey.300";
+                  if (pct < 33) return "#2e7d32"; // Green
+                  if (pct < 66) return "#ed6c02"; // Amber
+                  return "#d32f2f"; // Red
+                };
 
-                if (!finalLlm && !finalPython) {
-                  return (
-                    <Card variant="outlined" sx={{ mb: 3, bgcolor: "#f8f9fa" }}>
-                      <CardContent>
-                        <Typography
-                          variant="subtitle2"
-                          sx={{
-                            fontWeight: 600,
-                            mb: 1,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                          }}
-                        >
-                          <span role="img" aria-label="sparkles">✨</span> Overall Summary
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          No  analysis data available. Run Quality and PII checks to generate an summary.
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  );
-                }
+                const renderBar = (label, pct) => (
+                  <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {label}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: getBarColor(pct) }}>
+                        {pct != null ? `${pct}%` : "N/A"}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ height: 8, width: '100%', bgcolor: 'grey.200', borderRadius: 4, overflow: 'hidden' }}>
+                      <Box sx={{ height: '100%', width: `${pct ?? 0}%`, bgcolor: getBarColor(pct), transition: 'width 0.5s ease' }} />
+                    </Box>
+                  </Box>
+                );
 
                 return (
-                  <Card variant="outlined" sx={{ mb: 3, bgcolor: "#f8f9fa" }}>
-                    <CardContent>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{
-                          fontWeight: 600,
-                          mb: 2,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                        }}
-                      >
-                        <span role="img" aria-label="sparkles">✨</span>Analysis Summary
+                  <Box>
+                    {/* Metrics Section */}
+                    <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                      {renderBar("Missing Data", llm.missing_data_pct)}
+                      {renderBar("Junk Data (Incorrect Format)", llm.junk_data_pct)}
+                      {renderBar("Outliers", llm.outlier_pct)}
+                    </Card>
+
+                    {/* Trend Section */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <span role="img" aria-label="chart">📈</span> Trend Analysis
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                        {llm.trend || "No prior runs to compute deviation."}
+                      </Typography>
+                    </Box>
+
+                    {/* Summary Section */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                        Summary
+                      </Typography>
+                      
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        Technical Context
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        {llm.technical_summary || "N/A"}
                       </Typography>
 
-                      {(() => {
-                        const getScoreColor = (val) => {
-                          if (val === 0) return "#2e7d32"; // Green
-                          if (val <= 30) return "#ed6c02"; // Amber
-                          return "#d32f2f"; // Red
-                        };
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                        Metadata Overview
+                      </Typography>
+                      <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, boxShadow: 'none' }}>
+                        <Table size="small">
+                          <TableHead sx={{ bgcolor: 'grey.50' }}>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 700 }}>Property</TableCell>
+                              <TableCell sx={{ fontWeight: 700 }}>Value</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600 }}>Table/Dataset Name</TableCell>
+                              <TableCell>{profile.dataset.dataset_name}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600 }}>Schema</TableCell>
+                              <TableCell>{profile.dataset.schema_name || "N/A"}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600 }}>Connector Type</TableCell>
+                              <TableCell>{profile.dataset.connector_type || "N/A"}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600 }}>Row Count</TableCell>
+                              <TableCell>{profile.dataset.row_count ?? "N/A"}</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600 }}>Column Count</TableCell>
+                              <TableCell>{profile.dataset.column_count ?? (profile.columns?.length || 0)}</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Box>
 
-                        const outliers = finalPython?.outliers_count ?? 0;
-                        const confidence = finalPython?.confidence_score ?? 0;
-                        // The user said "confident", assuming it might be confidence_score or similar
-                        
-                        return (
-                          <Box sx={{ mb: 3 }}>
-                            <Box sx={{ mb: 2 }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: getScoreColor(outliers) }}>
-                                  Outliers: {outliers === 0 ? "Not Available" : outliers}
-                                </Typography>
-                              </Box>
-                              <Box sx={{ height: 6, width: '100%', bgcolor: '#eee', borderRadius: 1, overflow: 'hidden' }}>
-                                <Box sx={{ height: '100%', width: `${Math.min(outliers, 100)}%`, bgcolor: getScoreColor(outliers), transition: 'width 0.5s ease' }} />
-                              </Box>
-                            </Box>
-
-                            <Box sx={{ mb: 2 }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: getScoreColor(confidence) }}>
-                                  Confidence: {confidence}
-                                </Typography>
-                              </Box>
-                              <Box sx={{ height: 6, width: '100%', bgcolor: '#eee', borderRadius: 1, overflow: 'hidden' }}>
-                                <Box sx={{ height: '100%', width: `${Math.min(confidence, 100)}%`, bgcolor: getScoreColor(confidence), transition: 'width 0.5s ease' }} />
-                              </Box>
-                            </Box>
-                          </Box>
-                        );
-                      })()}
-                      
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    {/* LLM Based Sections */}
+                    <Stack spacing={3}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
                           Contextual Summary
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {finalLlm?.contextual_summary || "N/A"}
+                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                          {llm.contextual_summary || "N/A"}
                         </Typography>
                       </Box>
 
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          Technical Summary
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                          PII Data Inspection
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {finalLlm?.technical_summary || "N/A"}
-                        </Typography>
-                      </Box>
-
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          PII Inspection
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {finalLlm?.pii_inspection || "N/A"}
+                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                          {llm.pii_inspection || "No PII patterns detected."}
                         </Typography>
                       </Box>
 
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          Differences
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                          Differences / Baseline Comparison
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {finalLlm?.differences || "N/A"}
+                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                          {llm.differences || "This is the first recorded run; no baseline exists."}
                         </Typography>
                       </Box>
 
-                      {finalLlm?.recommendations && finalLlm.recommendations.length > 0 && (
-                        <Box sx={{ mb: 0 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      {llm.recommendations && llm.recommendations.length > 0 && (
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
                             Recommendations
                           </Typography>
-                          <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "rgba(0, 0, 0, 0.6)" }}>
-                            {finalLlm.recommendations.map((rec, idx) => (
-                              <li key={idx} style={{ fontSize: "0.875rem", marginBottom: "4px" }}>
-                                {rec}
-                              </li>
-                            ))}
-                          </ul>
+                          <Box sx={{ p: 2, bgcolor: 'primary.50', borderRadius: 1, border: '1px solid', borderColor: 'primary.100' }}>
+                            <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
+                              {llm.recommendations.map((rec, idx) => (
+                                <li key={idx}>
+                                  <Typography variant="body2" color="text.primary">
+                                    {rec}
+                                  </Typography>
+                                </li>
+                              ))}
+                            </ul>
+                          </Box>
                         </Box>
                       )}
-
-
-                      {/* <Stack direction="row" spacing={3} sx={{ mb: 2 }}>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            Rules Passed
-                          </Typography>
-                          <Typography variant="body2" color="success.main">
-                            {llm?.rules_passed || 0}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            Rules Failed
-                          </Typography>
-                          <Typography variant="body2" color="error.main">
-                            {llm?.rules_failed || 0}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            Severity
-                          </Typography>
-                          <Chip 
-                            label={llm?.severity ? llm.severity.toUpperCase() : "N/A"} 
-                            size="small" 
-                            color={llm?.severity === 'critical' ? 'error' : llm?.severity === 'high' ? 'warning' : 'default'} 
-                          />
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                            Rulebook Used
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {llm?.rulebook_used || "N/A"}
-                          </Typography>
-                        </Box>
-                      </Stack> */}
-
-
-                    </CardContent>
-                  </Card>
+                    </Stack>
+                  </Box>
                 );
               })()}
             </Box>
