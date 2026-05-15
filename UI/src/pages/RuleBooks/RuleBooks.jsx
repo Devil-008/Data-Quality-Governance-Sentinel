@@ -369,7 +369,13 @@ const RuleBooks = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={dialogOpen} 
+        onClose={closeDialog} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{ sx: { bgcolor: "#ffffff" } }}
+      >
         <DialogTitle>Upload Rule Book</DialogTitle>
         <DialogContent dividers>
           {uploading ? (
@@ -509,7 +515,7 @@ const RuleBooks = () => {
         anchor="right"
         open={drawerOpen}
         onClose={closeDrawer}
-        PaperProps={{ sx: { width: { xs: "100%", md: 600 } } }}
+        PaperProps={{ sx: { width: { xs: "100%", md: 600 }, bgcolor: "#ffffff" } }}
       >
         <Box sx={{ p: 3 }}>
           <Stack
@@ -597,6 +603,7 @@ const RuleBooks = () => {
         onClose={closeAddRuleDialog}
         maxWidth="sm"
         fullWidth
+        PaperProps={{ sx: { bgcolor: "#ffffff" } }}
       >
         <DialogTitle>Add Validation Rule</DialogTitle>
         <DialogContent dividers>

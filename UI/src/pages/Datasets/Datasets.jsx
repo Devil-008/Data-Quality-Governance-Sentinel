@@ -222,7 +222,7 @@ const Datasets = () => {
         anchor="right"
         open={drawerOpen}
         onClose={closeProfile}
-        PaperProps={{ sx: { width: { xs: "100%", md: 720 } } }}
+        PaperProps={{ sx: { width: { xs: "100%", md: 720 }, bgcolor: "#ffffff" } }}
       >
         <Box sx={{ p: 3 }}>
           <Stack
@@ -259,28 +259,40 @@ const Datasets = () => {
                 const llm = profile.llm_report || {};
                 const python = profile.python_result || {};
 
-                const getBarColor = (pct) => {
+                const getBarColor = (pct, isOutlier = false) => {
                   if (pct == null) return "grey.300";
-                  if (pct < 33) return "#2e7d32"; // Green
+                  if (isOutlier) {
+                    if (pct === 0) return "#2e7d32"; // Green for 0 outliers
+                    if (pct < 10) return "#ed6c02"; // Amber for few outliers
+                    return "#d32f2f"; // Red for many outliers
+                  }
+                  if (pct < 33) return "#2e7d32"; // Green for low missing/junk
                   if (pct < 66) return "#ed6c02"; // Amber
                   return "#d32f2f"; // Red
                 };
 
-                const renderBar = (label, pct) => (
-                  <Box sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {label}
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: getBarColor(pct) }}>
-                        {pct != null ? `${pct}%` : "N/A"}
-                      </Typography>
+                const renderBar = (label, pct) => {
+                  const isOutlier = label.toLowerCase().includes("outlier");
+                  // For outliers, 0% means 100% health, 100% means 0% health
+                  const displayPct = isOutlier ? Math.max(0, 100 - (pct ?? 0)) : (pct ?? 0);
+                  const color = getBarColor(pct, isOutlier);
+
+                  return (
+                    <Box sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {label}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: color }}>
+                          {pct != null ? `${pct}%` : "N/A"}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ height: 8, width: '100%', bgcolor: 'grey.200', borderRadius: 4, overflow: 'hidden' }}>
+                        <Box sx={{ height: '100%', width: `${displayPct}%`, bgcolor: color, transition: 'width 0.5s ease' }} />
+                      </Box>
                     </Box>
-                    <Box sx={{ height: 8, width: '100%', bgcolor: 'grey.200', borderRadius: 4, overflow: 'hidden' }}>
-                      <Box sx={{ height: '100%', width: `${pct ?? 0}%`, bgcolor: getBarColor(pct), transition: 'width 0.5s ease' }} />
-                    </Box>
-                  </Box>
-                );
+                  );
+                };
 
                 return (
                   <Box>

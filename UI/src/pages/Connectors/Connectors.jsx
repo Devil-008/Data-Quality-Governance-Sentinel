@@ -396,7 +396,13 @@ const Connectors = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={dialogOpen} 
+        onClose={closeDialog} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{ sx: { bgcolor: "#ffffff" } }}
+      >
         <DialogTitle>
           {editMode ? "Edit Connector" : "Add Connector"}
         </DialogTitle>

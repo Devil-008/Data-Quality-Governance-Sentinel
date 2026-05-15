@@ -326,6 +326,7 @@ const Monitoring = () => {
         onClose={() => setDialogOpen(false)}
         maxWidth="sm"
         fullWidth
+        PaperProps={{ sx: { bgcolor: "#ffffff" } }}
       >
         <DialogTitle>New Monitoring Job</DialogTitle>
         <DialogContent dividers>
