@@ -119,8 +119,8 @@ const Datasets = () => {
 
     return (
       d.dataset_name?.toLowerCase().includes(search) ||
-        d.schema_name?.toLowerCase().includes(search) ||
-        d.connector_name?.toLowerCase().includes(search)
+      d.dataset_type?.toLowerCase().includes(search) ||
+      d.connector_name?.toLowerCase().includes(search)
     );
   });
 
@@ -165,7 +165,7 @@ const Datasets = () => {
             onChange={(e) => handleFilterChange("q", e.target.value)}
             sx={{ flex: 1, maxWidth: 200 }}
           />
-          <TextField
+          {/* <TextField
             select
             label="Connector"
             size="small"
@@ -181,7 +181,7 @@ const Datasets = () => {
                 {c.name} ({c.type})
               </MenuItem>
             ))}
-          </TextField>
+          </TextField> */}
           <Button
             startIcon={<RefreshIcon />}
             onClick={() => applyFilters(filters)}
@@ -321,7 +321,7 @@ const Datasets = () => {
                           <span role="img" aria-label="sparkles">✨</span> Overall Summary
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          No AI analysis data available. Run Quality and PII checks to generate an AI summary.
+                          No  analysis data available. Run Quality and PII checks to generate an summary.
                         </Typography>
                       </CardContent>
                     </Card>
@@ -370,6 +370,21 @@ const Datasets = () => {
                           {llm?.differences || "N/A"}
                         </Typography>
                       </Box>
+
+                      {llm?.recommendations && llm.recommendations.length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            Recommendations
+                          </Typography>
+                          <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                            {llm.recommendations.map((rec, idx) => (
+                              <Typography component="li" variant="body2" color="text.secondary" key={idx}>
+                                {rec}
+                              </Typography>
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
 
 
                       {/* <Stack direction="row" spacing={3} sx={{ mb: 2 }}>
