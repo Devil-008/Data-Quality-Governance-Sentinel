@@ -405,7 +405,7 @@ const RuleBooks = () => {
               {savingError && <Alert severity="error">{savingError}</Alert>}
 
               {/* Connector Type Selection */}
-              <Box>
+              {/* <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                   Connector Type (Optional)
                 </Typography>
@@ -429,7 +429,7 @@ const RuleBooks = () => {
                 <Typography variant="caption" color="text.secondary">
                   If omitted, the system will try to auto-detect the connector type from the file content.
                 </Typography>
-              </Box>
+              </Box> */}
 
               {/* File Upload with Drag & Drop */}
               <Box>
