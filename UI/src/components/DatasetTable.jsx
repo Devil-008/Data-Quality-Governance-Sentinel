@@ -138,19 +138,21 @@ const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
                   (() => {
                     const count = d.outlier_count;
                     let color = "#2e7d32"; // Green
-                    let progress = 0;
+                    let progress = 100;
+                    
                     if (count > 10) {
                       color = "#d32f2f"; // Red
-                      progress = 100;
+                      progress = Math.max(10, 50 - (count - 10) * 2);
                     } else if (count > 0) {
                       color = "#ed6c02"; // Amber
-                      progress = 50;
+                      progress = 100 - (count * 5);
                     }
+                    
                     return (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                        <Typography sx={{ fontWeight: 700, fontSize: "0.875rem", color: color, minWidth: 20 }}>
+                        {/* <Typography sx={{ fontWeight: 700, fontSize: "0.875rem", color: color, minWidth: 20 }}>
                           {count}
-                        </Typography>
+                        </Typography> */}
                         <Box sx={{ height: 6, width: 40, bgcolor: "grey.200", borderRadius: 3, overflow: "hidden", display: { xs: 'none', sm: 'block' } }}>
                           <Box sx={{ height: "100%", width: `${progress}%`, bgcolor: color }} />
                         </Box>
