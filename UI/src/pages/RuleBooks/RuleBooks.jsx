@@ -183,6 +183,7 @@ const RuleBooks = () => {
     const res = await dispatch(
       createRuleBook({
         file,
+        connectorType,
       }),
     );
     setUploading(false);
@@ -385,6 +386,33 @@ const RuleBooks = () => {
           ) : (
             <Stack spacing={2} sx={{ mt: 1 }}>
               {savingError && <Alert severity="error">{savingError}</Alert>}
+
+              {/* Connector Type Selection */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                  Connector Type (Optional)
+                </Typography>
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={connectorType}
+                  onChange={(e) => setConnectorType(e.target.value)}
+                  placeholder="Auto-detect if omitted"
+                >
+                  <MenuItem value="">
+                    <em>Auto-detect</em>
+                  </MenuItem>
+                  <MenuItem value="MYSQL">MySQL</MenuItem>
+                  <MenuItem value="MSSQL">MSSQL</MenuItem>
+                  <MenuItem value="ADF">Azure Data Factory (ADF)</MenuItem>
+                  <MenuItem value="DATABRICKS">Databricks</MenuItem>
+                  <MenuItem value="GITHUB">GitHub</MenuItem>
+                </TextField>
+                <Typography variant="caption" color="text.secondary">
+                  If omitted, the system will try to auto-detect the connector type from the file content.
+                </Typography>
+              </Box>
 
               {/* File Upload with Drag & Drop */}
               <Box>

@@ -17,10 +17,11 @@ export const fetchRuleBooks = createAsyncThunk(
 
 export const createRuleBook = createAsyncThunk(
   "ruleBooks/create",
-  async ({ file }, { rejectWithValue, dispatch }) => {
+  async ({ file, connectorType }, { rejectWithValue, dispatch }) => {
     try {
       const formData = new FormData();
       if (file) formData.append("file", file);
+      if (connectorType) formData.append("connector_type", connectorType);
 
       const res = await api.post("/api/rule-books/create", formData);
       dispatch(fetchRuleBooks());
