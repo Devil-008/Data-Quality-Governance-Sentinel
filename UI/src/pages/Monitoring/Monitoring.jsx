@@ -56,6 +56,7 @@ const Monitoring = () => {
   const { jobs, runs, loading, error } = useSelector((s) => s.monitoring);
   const connectors = useSelector((s) => s.connectors.list);
 
+  const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({
     connector_id: "",
@@ -104,6 +105,19 @@ const Monitoring = () => {
     refresh();
   };
 
+  const filteredJobs = jobs.filter(j => 
+    j.connector_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    j.job_type?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredRuns = runs.filter(r => 
+    r.connector_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    r.dataset_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    r.status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    r.run_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    r.message?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <Box>
       <Stack
@@ -119,6 +133,8 @@ const Monitoring = () => {
           <TextField
             label="Search"
             size="small"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             sx={{ flex: 1, maxWidth: 200 }}
           />
           {/* <Button startIcon={<AddIcon />} onClick={openDialog} variant="contained">New Job</Button> */}
@@ -141,14 +157,14 @@ const Monitoring = () => {
           <Card>
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Scheduled Jobs ({jobs.length})
+                Scheduled Jobs ({filteredJobs.length})
               </Typography>
               {loading && jobs.length === 0 ? (
                 <Loader label="Loading jobs..." />
-              ) : jobs.length === 0 ? (
+              ) : filteredJobs.length === 0 ? (
                 <Box sx={{ py: 4, textAlign: 'center' }}>
                   <Typography color="text.secondary">
-                    No scheduled jobs yet. Create one to enable automatic monitoring.
+                    {searchTerm ? "No matching jobs found." : "No scheduled jobs yet."}
                   </Typography>
                 </Box>
               ) : (
@@ -166,7 +182,7 @@ const Monitoring = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {jobs.map((j) => (
+                      {filteredJobs.map((j) => (
                         <TableRow key={j.id} hover>
                           <TableCell>{j.connector_name}</TableCell>
                           <TableCell><Chip label={j.job_type} size="small" variant="outlined" /></TableCell>
@@ -210,13 +226,12 @@ const Monitoring = () => {
           <Card>
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Recent Monitoring Runs ({runs.length})
+                Recent Monitoring Runs ({filteredRuns.length})
               </Typography>
-              {runs.length === 0 ? (
+              {filteredRuns.length === 0 ? (
                 <Box sx={{ py: 4, textAlign: "center" }}>
                   <Typography color="text.secondary">
-                    No runs yet. Trigger a scan from the Connectors page or
-                    create a job.
+                    {searchTerm ? "No matching runs found." : "No runs yet. Trigger a scan from the Connectors page or create a job."}
                   </Typography>
                 </Box>
               ) : (
@@ -248,7 +263,7 @@ const Monitoring = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {runs.map((r) => (
+                      {filteredRuns.map((r) => (
                         <TableRow key={r.id} hover>
                           <TableCell>
                             <Chip label={r.run_type} size="small" />
