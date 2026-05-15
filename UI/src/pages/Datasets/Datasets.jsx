@@ -364,6 +364,76 @@ const Datasets = () => {
                       </TableContainer>
                     </Box>
 
+                    {/* Technical Discovery & Schema */}
+                    {(() => {
+                      let techContext = null;
+                      try {
+                        const profilingJson = profile.dataset.profiling_json ? JSON.parse(profile.dataset.profiling_json) : null;
+                        techContext = profilingJson?.profile?.summary?.technical_context;
+                      } catch (e) {
+                        console.error("Error parsing profiling_json", e);
+                      }
+
+                      if (!techContext || !techContext.tables || techContext.tables.length === 0) return null;
+
+                      return (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <span role="img" aria-label="discovery">🔎</span> Technical Discovery & Schema
+                          </Typography>
+                          {techContext.tables.map((table, tidx) => (
+                            <Box key={tidx} sx={{ mb: 2 }}>
+                              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                                  <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                                      {table.table_name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      Schema: {table.schema || 'N/A'} · Source Kind: {techContext.source_kind || 'table'}
+                                    </Typography>
+                                  </Box>
+                                  <Chip 
+                                    label={`${table.column_count || 0} Columns`} 
+                                    size="small" 
+                                    sx={{ fontWeight: 600, bgcolor: 'white' }} 
+                                  />
+                                </Stack>
+
+                                <TableContainer component={Paper} sx={{ maxHeight: 300, boxShadow: 'none', border: '1px solid', borderColor: 'divider' }}>
+                                  <Table size="small" stickyHeader>
+                                    <TableHead>
+                                      <TableRow>
+                                        <TableCell sx={{ fontWeight: 700, bgcolor: 'white', fontSize: '0.75rem' }}>Column Name</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, bgcolor: 'white', fontSize: '0.75rem' }}>Data Type</TableCell>
+                                      </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                      {(table.columns || []).map((col, cidx) => (
+                                        <TableRow key={cidx} hover>
+                                          <TableCell sx={{ fontSize: '0.75rem', py: 0.5, fontFamily: 'monospace' }}>
+                                            {col.name}
+                                          </TableCell>
+                                          <TableCell sx={{ fontSize: '0.7rem', py: 0.5 }}>
+                                            <Chip 
+                                              label={col.type} 
+                                              size="small" 
+                                              variant="outlined" 
+                                              sx={{ height: 18, fontSize: '0.6rem', color: 'text.secondary' }} 
+                                            />
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </TableContainer>
+                              </Paper>
+                            </Box>
+                          ))}
+                        </Box>
+                      );
+                    })()}
+
                     {/* Intelligence Sections */}
                     <Stack spacing={3}>
                       {isPipeline && (python.run_details?.length > 0) && (
