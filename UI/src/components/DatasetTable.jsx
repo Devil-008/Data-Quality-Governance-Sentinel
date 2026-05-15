@@ -80,7 +80,7 @@ const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
             <TableCell sx={headerCellSx}>Schema</TableCell>
             <TableCell sx={headerCellSx}>Type</TableCell>
             <TableCell sx={headerCellSx}>Outliers</TableCell>
-            <TableCell sx={headerCellSx}>Confident (%)</TableCell>
+            <TableCell sx={headerCellSx}>Confidence Score (%)</TableCell>
             <TableCell sx={headerCellSx}>PII</TableCell>
             <TableCell sx={{ ...headerCellSx, textAlign: "right" }}>
               Deep Thinking
