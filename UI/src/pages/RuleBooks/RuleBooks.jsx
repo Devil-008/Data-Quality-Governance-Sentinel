@@ -244,6 +244,23 @@ const RuleBooks = () => {
     }
   };
 
+   // Shared header cell style
+  const headerCellSx = {
+    fontSize: "20px",       // 14px — clearly larger than default small
+    fontWeight: 700,
+    color: "text.primary",
+    letterSpacing: "0.02em",
+    py: 1.5,
+    whiteSpace: "nowrap",
+  };
+
+  // Shared body cell style
+  const bodyCellSx = {
+    fontSize: "16px",
+    fontWeight: 600,
+    py: 1.25,
+  };
+
   return (
     <Box>
       <Stack
@@ -298,16 +315,16 @@ const RuleBooks = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>
+                    <TableCell sx={headerCellSx}>
                       <strong>Name</strong>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={headerCellSx}>
                       <strong>Connector Type</strong>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={headerCellSx}>
                       <strong>Created At</strong>
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell sx={headerCellSx} align="right">
                       <strong>Actions</strong>
                     </TableCell>
                   </TableRow>
@@ -320,13 +337,13 @@ const RuleBooks = () => {
                       onClick={() => openRuleBook(rb)}
                       sx={{ cursor: "pointer" }}
                     >
-                      <TableCell sx={{ fontWeight: 500 }}>
+                      <TableCell sx={bodyCellSx}>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <DescriptionIcon fontSize="small" color="primary" />
                           {rb.rulebook_name || rb.name}
                         </Stack>
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={bodyCellSx}>
                         {rb.connector_type ? (
                           <Chip
                             label={rb.connector_type}
@@ -339,14 +356,14 @@ const RuleBooks = () => {
                           </Typography>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={bodyCellSx}>
                         <Typography variant="caption">
                           {rb.created_at
                             ? new Date(rb.created_at).toLocaleString()
                             : "-"}
                         </Typography>
                       </TableCell>
-                      <TableCell
+                      <TableCell sx={bodyCellSx}
                         align="right"
                         onClick={(e) => e.stopPropagation()}
                       >
