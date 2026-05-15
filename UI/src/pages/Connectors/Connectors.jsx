@@ -56,14 +56,14 @@ const TYPE_FIELDS = {
     { key: "port", label: "Port", required: true, defaultValue: "3306" },
     { key: "username", label: "Username", required: true },
     { key: "password", label: "Password", required: true, secret: true },
-    { key: "database", label: "Database Name", required: true },
+    { key: "database", label: "Database Name", required: false },
   ],
   mssql: [
     { key: "server", label: "Server", required: true },
     { key: "port", label: "Port", required: true, defaultValue: "1433" },
     { key: "username", label: "Username", required: true },
     { key: "password", label: "Password", required: true, secret: true },
-    { key: "database", label: "Database", required: true },
+    { key: "database", label: "Database", required: false },
   ],
   azure_adf: [
     { key: "subscription_id", label: "Subscription ID", required: true },

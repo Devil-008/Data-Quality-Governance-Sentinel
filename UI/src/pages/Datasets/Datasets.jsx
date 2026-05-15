@@ -258,6 +258,7 @@ const Datasets = () => {
               {(() => {
                 const llm = profile.llm_report || {};
                 const python = profile.python_result || {};
+                const isPipeline = profile.dataset.dataset_type === 'pipeline';
 
                 const getBarColor = (pct, isOutlier = false) => {
                   if (pct == null) return "grey.300";
@@ -320,10 +321,10 @@ const Datasets = () => {
                       </Typography>
                       
                       <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                        Technical Context
+                        Technical Summary
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        {llm.technical_summary || "N/A"}
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, p: 1.5, bgcolor: 'grey.50', borderRadius: 1, border: '1px border-left', borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
+                        {python.technical_summary || llm.technical_summary || "No technical summary available."}
                       </Typography>
 
                       <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
@@ -363,45 +364,123 @@ const Datasets = () => {
                       </TableContainer>
                     </Box>
 
-                    {/* LLM Based Sections */}
+                    {/* Intelligence Sections */}
                     <Stack spacing={3}>
+                      {isPipeline && (python.run_details?.length > 0) && (
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <span role="img" aria-label="history">📜</span> Pipeline Execution History
+                          </Typography>
+                          <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, maxHeight: 400, overflow: 'auto' }}>
+                            <Table size="small" stickyHeader>
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Status</TableCell>
+                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Run Start</TableCell>
+                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Duration</TableCell>
+                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Reason/Solution</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {python.run_details.map((run, idx) => (
+                                  <TableRow key={idx} hover>
+                                    <TableCell>
+                                      <Chip 
+                                        label={run.status} 
+                                        size="small" 
+                                        color={run.status === 'SUCCESS' ? 'success' : run.status === 'FAILED' ? 'error' : 'warning'}
+                                        sx={{ fontWeight: 600, height: 20, fontSize: '0.65rem' }}
+                                      />
+                                    </TableCell>
+                                    <TableCell sx={{ fontSize: '0.75rem' }}>
+                                      {run.run_start ? new Date(run.run_start).toLocaleString() : '-'}
+                                    </TableCell>
+                                    <TableCell sx={{ fontSize: '0.75rem' }}>
+                                      {run.duration_minutes ? `${run.duration_minutes}m` : '-'}
+                                    </TableCell>
+                                    <TableCell>
+                                      {run.status === 'FAILED' && (
+                                        <Box>
+                                          <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, display: 'block' }}>
+                                            {run.failure_reason}
+                                          </Typography>
+                                          {run.recommended_solution && (
+                                            <Typography variant="caption" sx={{ color: 'primary.main', fontStyle: 'italic' }}>
+                                              Fix: {run.recommended_solution}
+                                            </Typography>
+                                          )}
+                                        </Box>
+                                      )}
+                                      {run.status === 'SUCCESS' && <Typography variant="caption" color="text.secondary">Success</Typography>}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </Box>
+                      )}
+
+                      {python.pipeline_meta?.activities?.length > 0 && (
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <span role="img" aria-label="activities">⚡</span> Pipeline Activities
+                          </Typography>
+                          <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                            <Stack direction="row" flexWrap="wrap" spacing={1} useFlexGap>
+                              {python.pipeline_meta.activities.map((act, idx) => (
+                                <Chip 
+                                  key={idx} 
+                                  label={`${act.name} (${act.type})`} 
+                                  size="small" 
+                                  variant="outlined" 
+                                  sx={{ bgcolor: 'white' }}
+                                />
+                              ))}
+                            </Stack>
+                          </Box>
+                        </Box>
+                      )}
+
                       <Box>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                          Contextual Summary
+                          Contextual Insights
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                          {llm.contextual_summary || "N/A"}
+                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                          {python.contextual_summary || llm.contextual_summary || "No contextual insights available."}
                         </Typography>
                       </Box>
 
                       <Box>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                          PII Data Inspection
+                          Baseline & Anomalies
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                          {llm.pii_inspection || "No PII patterns detected."}
-                        </Typography>
-                      </Box>
-
-                      <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                          Differences / Baseline Comparison
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                          {llm.differences || "This is the first recorded run; no baseline exists."}
+                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                          {python.differences || llm.differences || "This is the first recorded run; no baseline exists."}
                         </Typography>
                       </Box>
 
-                      {llm.recommendations && llm.recommendations.length > 0 && (
+                      {llm.pii_inspection && (
                         <Box>
                           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                            Recommendations
+                            PII Data Inspection
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                            {llm.pii_inspection}
+                          </Typography>
+                        </Box>
+                      )}
+
+                      {(llm.recommendations?.length > 0 || python.findings?.length > 0) && (
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'primary.main' }}>
+                            Actionable Recommendations
                           </Typography>
                           <Box sx={{ p: 2, bgcolor: 'primary.50', borderRadius: 1, border: '1px solid', borderColor: 'primary.100' }}>
                             <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
-                              {llm.recommendations.map((rec, idx) => (
+                              { (llm.recommendations || []).concat(python.findings || []).map((rec, idx) => (
                                 <li key={idx}>
-                                  <Typography variant="body2" color="text.primary">
+                                  <Typography variant="body2" color="text.primary" sx={{ fontWeight: 500 }}>
                                     {rec}
                                   </Typography>
                                 </li>
