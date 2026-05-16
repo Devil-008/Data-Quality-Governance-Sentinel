@@ -226,7 +226,9 @@ const Datasets = () => {
         anchor="right"
         open={drawerOpen}
         onClose={closeProfile}
-        PaperProps={{ sx: { width: { xs: "100%", md: 720 }, bgcolor: "#ffffff" } }}
+        PaperProps={{
+          sx: { width: { xs: "100%", md: 720 }, bgcolor: "#ffffff" },
+        }}
       >
         <Box sx={{ p: 3 }}>
           <Stack
@@ -266,7 +268,7 @@ const Datasets = () => {
               {(() => {
                 const llm = profile.llm_report || {};
                 const python = profile.python_result || {};
-                const isPipeline = profile.dataset.dataset_type === 'pipeline';
+                const isPipeline = profile.dataset.dataset_type === "pipeline";
 
                 const getBarColor = (pct, isOutlier = false) => {
                   if (pct == null) return "grey.300";
@@ -283,21 +285,47 @@ const Datasets = () => {
                 const renderBar = (label, pct) => {
                   const isOutlier = label.toLowerCase().includes("outlier");
                   // For outliers, 0% means 100% health, 100% means 0% health
-                  const displayPct = isOutlier ? Math.max(0, 100 - (pct ?? 0)) : (pct ?? 0);
+                  const displayPct = isOutlier
+                    ? Math.max(0, 100 - (pct ?? 0))
+                    : (pct ?? 0);
                   const color = getBarColor(pct, isOutlier);
 
                   return (
                     <Box sx={{ mb: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          mb: 0.5,
+                        }}
+                      >
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           {label}
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: color }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 700, color: color }}
+                        >
                           {pct != null ? `${pct}%` : "N/A"}
                         </Typography>
                       </Box>
-                      <Box sx={{ height: 8, width: '100%', bgcolor: 'grey.200', borderRadius: 4, overflow: 'hidden' }}>
-                        <Box sx={{ height: '100%', width: `${displayPct}%`, bgcolor: color, transition: 'width 0.5s ease' }} />
+                      <Box
+                        sx={{
+                          height: 8,
+                          width: "100%",
+                          bgcolor: "grey.200",
+                          borderRadius: 4,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            height: "100%",
+                            width: `${displayPct}%`,
+                            bgcolor: color,
+                            transition: "width 0.5s ease",
+                          }}
+                        />
                       </Box>
                     </Box>
                   );
@@ -355,12 +383,29 @@ const Datasets = () => {
                       >
                         Summary
                       </Typography>
-                      
-                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, mb: 0.5 }}
+                      >
                         Technical Summary
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, p: 1.5, bgcolor: 'grey.50', borderRadius: 1, border: '1px border-left', borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
-                        {python.technical_summary || llm.technical_summary || "No technical summary available."}
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          mb: 2,
+                          p: 1.5,
+                          bgcolor: "grey.50",
+                          borderRadius: 1,
+                          border: "1px border-left",
+                          borderLeft: "4px solid",
+                          borderLeftColor: "primary.main",
+                        }}
+                      >
+                        {python.technical_summary ||
+                          llm.technical_summary ||
+                          "No technical summary available."}
                       </Typography>
 
                       <Typography
@@ -450,62 +495,141 @@ const Datasets = () => {
                     {(() => {
                       let techContext = null;
                       try {
-                        const profilingJson = profile.dataset.profiling_json ? JSON.parse(profile.dataset.profiling_json) : null;
-                        techContext = profilingJson?.profile?.summary?.technical_context;
+                        const profilingJson = profile.dataset.profiling_json
+                          ? JSON.parse(profile.dataset.profiling_json)
+                          : null;
+                        techContext =
+                          profilingJson?.profile?.summary?.technical_context;
                       } catch (e) {
                         console.error("Error parsing profiling_json", e);
                       }
 
-                      if (!techContext || !techContext.tables || techContext.tables.length === 0) return null;
+                      if (
+                        !techContext ||
+                        !techContext.tables ||
+                        techContext.tables.length === 0
+                      )
+                        return null;
 
                       return (
                         <Box sx={{ mb: 3 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span role="img" aria-label="discovery">🔎</span> Technical Discovery & Schema
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontWeight: 700,
+                              mb: 1,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <span role="img" aria-label="discovery">
+                              🔎
+                            </span>{" "}
+                            Technical Discovery & Schema
                           </Typography>
                           {techContext.tables.map((table, tidx) => (
                             <Box key={tidx} sx={{ mb: 2 }}>
-                              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
-                                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                              <Paper
+                                variant="outlined"
+                                sx={{ p: 2, bgcolor: "grey.50" }}
+                              >
+                                <Stack
+                                  direction="row"
+                                  justifyContent="space-between"
+                                  alignItems="center"
+                                  sx={{ mb: 1.5 }}
+                                >
                                   <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        fontWeight: 700,
+                                        color: "primary.main",
+                                      }}
+                                    >
                                       {table.table_name}
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      Schema: {table.schema || 'N/A'} · Source Kind: {techContext.source_kind || 'table'}
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      Schema: {table.schema || "N/A"} · Source
+                                      Kind: {techContext.source_kind || "table"}
                                     </Typography>
                                   </Box>
-                                  <Chip 
-                                    label={`${table.column_count || 0} Columns`} 
-                                    size="small" 
-                                    sx={{ fontWeight: 600, bgcolor: 'white' }} 
+                                  <Chip
+                                    label={`${table.column_count || 0} Columns`}
+                                    size="small"
+                                    sx={{ fontWeight: 600, bgcolor: "white" }}
                                   />
                                 </Stack>
 
-                                <TableContainer component={Paper} sx={{ maxHeight: 300, boxShadow: 'none', border: '1px solid', borderColor: 'divider' }}>
+                                <TableContainer
+                                  component={Paper}
+                                  sx={{
+                                    maxHeight: 300,
+                                    boxShadow: "none",
+                                    border: "1px solid",
+                                    borderColor: "divider",
+                                  }}
+                                >
                                   <Table size="small" stickyHeader>
                                     <TableHead>
                                       <TableRow>
-                                        <TableCell sx={{ fontWeight: 700, bgcolor: 'white', fontSize: '0.75rem' }}>Column Name</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, bgcolor: 'white', fontSize: '0.75rem' }}>Data Type</TableCell>
+                                        <TableCell
+                                          sx={{
+                                            fontWeight: 700,
+                                            bgcolor: "white",
+                                            fontSize: "0.75rem",
+                                          }}
+                                        >
+                                          Column Name
+                                        </TableCell>
+                                        <TableCell
+                                          sx={{
+                                            fontWeight: 700,
+                                            bgcolor: "white",
+                                            fontSize: "0.75rem",
+                                          }}
+                                        >
+                                          Data Type
+                                        </TableCell>
                                       </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                      {(table.columns || []).map((col, cidx) => (
-                                        <TableRow key={cidx} hover>
-                                          <TableCell sx={{ fontSize: '0.75rem', py: 0.5, fontFamily: 'monospace' }}>
-                                            {col.name}
-                                          </TableCell>
-                                          <TableCell sx={{ fontSize: '0.7rem', py: 0.5 }}>
-                                            <Chip 
-                                              label={col.type} 
-                                              size="small" 
-                                              variant="outlined" 
-                                              sx={{ height: 18, fontSize: '0.6rem', color: 'text.secondary' }} 
-                                            />
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
+                                      {(table.columns || []).map(
+                                        (col, cidx) => (
+                                          <TableRow key={cidx} hover>
+                                            <TableCell
+                                              sx={{
+                                                fontSize: "0.75rem",
+                                                py: 0.5,
+                                                fontFamily: "monospace",
+                                              }}
+                                            >
+                                              {col.name}
+                                            </TableCell>
+                                            <TableCell
+                                              sx={{
+                                                fontSize: "0.7rem",
+                                                py: 0.5,
+                                              }}
+                                            >
+                                              <Chip
+                                                label={col.type}
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{
+                                                  height: 18,
+                                                  fontSize: "0.6rem",
+                                                  color: "text.secondary",
+                                                }}
+                                              />
+                                            </TableCell>
+                                          </TableRow>
+                                        ),
+                                      )}
                                     </TableBody>
                                   </Table>
                                 </TableContainer>
@@ -518,52 +642,133 @@ const Datasets = () => {
 
                     {/* Intelligence Sections */}
                     <Stack spacing={3}>
-                      {isPipeline && (python.run_details?.length > 0) && (
+                      {isPipeline && python.run_details?.length > 0 && (
                         <Box>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span role="img" aria-label="history">📜</span> Pipeline Execution History
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontWeight: 700,
+                              mb: 1,
+                              color: "error.main",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <span role="img" aria-label="history">
+                              📜
+                            </span>{" "}
+                            Pipeline Execution History
                           </Typography>
-                          <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, maxHeight: 400, overflow: 'auto' }}>
+                          <TableContainer
+                            component={Paper}
+                            variant="outlined"
+                            sx={{ mb: 2, maxHeight: 400, overflow: "auto" }}
+                          >
                             <Table size="small" stickyHeader>
                               <TableHead>
                                 <TableRow>
-                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Status</TableCell>
-                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Run Start</TableCell>
-                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Duration</TableCell>
-                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Reason/Solution</TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: "grey.100",
+                                    }}
+                                  >
+                                    Status
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: "grey.100",
+                                    }}
+                                  >
+                                    Run Start
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: "grey.100",
+                                    }}
+                                  >
+                                    Duration
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: "grey.100",
+                                    }}
+                                  >
+                                    Reason/Solution
+                                  </TableCell>
                                 </TableRow>
                               </TableHead>
                               <TableBody>
                                 {python.run_details.map((run, idx) => (
                                   <TableRow key={idx} hover>
                                     <TableCell>
-                                      <Chip 
-                                        label={run.status} 
-                                        size="small" 
-                                        color={run.status === 'SUCCESS' ? 'success' : run.status === 'FAILED' ? 'error' : 'warning'}
-                                        sx={{ fontWeight: 600, height: 20, fontSize: '0.65rem' }}
+                                      <Chip
+                                        label={run.status}
+                                        size="small"
+                                        color={
+                                          run.status === "SUCCESS"
+                                            ? "success"
+                                            : run.status === "FAILED"
+                                              ? "error"
+                                              : "warning"
+                                        }
+                                        sx={{
+                                          fontWeight: 600,
+                                          height: 20,
+                                          fontSize: "0.65rem",
+                                        }}
                                       />
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.75rem' }}>
-                                      {run.run_start ? new Date(run.run_start).toLocaleString() : '-'}
+                                    <TableCell sx={{ fontSize: "0.75rem" }}>
+                                      {run.run_start
+                                        ? new Date(
+                                            run.run_start,
+                                          ).toLocaleString()
+                                        : "-"}
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.75rem' }}>
-                                      {run.duration_minutes ? `${run.duration_minutes}m` : '-'}
+                                    <TableCell sx={{ fontSize: "0.75rem" }}>
+                                      {run.duration_minutes
+                                        ? `${run.duration_minutes}m`
+                                        : "-"}
                                     </TableCell>
                                     <TableCell>
-                                      {run.status === 'FAILED' && (
+                                      {run.status === "FAILED" && (
                                         <Box>
-                                          <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, display: 'block' }}>
+                                          <Typography
+                                            variant="caption"
+                                            sx={{
+                                              color: "error.main",
+                                              fontWeight: 600,
+                                              display: "block",
+                                            }}
+                                          >
                                             {run.failure_reason}
                                           </Typography>
                                           {run.recommended_solution && (
-                                            <Typography variant="caption" sx={{ color: 'primary.main', fontStyle: 'italic' }}>
+                                            <Typography
+                                              variant="caption"
+                                              sx={{
+                                                color: "primary.main",
+                                                fontStyle: "italic",
+                                              }}
+                                            >
                                               Fix: {run.recommended_solution}
                                             </Typography>
                                           )}
                                         </Box>
                                       )}
-                                      {run.status === 'SUCCESS' && <Typography variant="caption" color="text.secondary">Success</Typography>}
+                                      {run.status === "SUCCESS" && (
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                        >
+                                          Success
+                                        </Typography>
+                                      )}
                                     </TableCell>
                                   </TableRow>
                                 ))}
@@ -575,71 +780,164 @@ const Datasets = () => {
 
                       {python.pipeline_meta?.activities?.length > 0 && (
                         <Box>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span role="img" aria-label="activities">⚡</span> Pipeline Activities
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontWeight: 700,
+                              mb: 1,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <span role="img" aria-label="activities">
+                              ⚡
+                            </span>{" "}
+                            Pipeline Activities
                           </Typography>
-                          <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-                            <Stack direction="row" flexWrap="wrap" spacing={1} useFlexGap>
-                              {python.pipeline_meta.activities.map((act, idx) => (
-                                <Chip 
-                                  key={idx} 
-                                  label={`${act.name} (${act.type})`} 
-                                  size="small" 
-                                  variant="outlined" 
-                                  sx={{ bgcolor: 'white' }}
-                                />
-                              ))}
+                          <Box
+                            sx={{
+                              p: 2,
+                              bgcolor: "grey.50",
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          >
+                            <Stack
+                              direction="row"
+                              flexWrap="wrap"
+                              spacing={1}
+                              useFlexGap
+                            >
+                              {python.pipeline_meta.activities.map(
+                                (act, idx) => (
+                                  <Chip
+                                    key={idx}
+                                    label={`${act.name} (${act.type})`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ bgcolor: "white" }}
+                                  />
+                                ),
+                              )}
                             </Stack>
                           </Box>
                         </Box>
                       )}
 
                       <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 700, mb: 1 }}
+                        >
                           Contextual Insights
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-                          {python.contextual_summary || llm.contextual_summary || "No contextual insights available."}
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            p: 2,
+                            bgcolor: "grey.50",
+                            borderRadius: 1,
+                            border: "1px solid",
+                            borderColor: "divider",
+                          }}
+                        >
+                          {python.contextual_summary ||
+                            llm.contextual_summary ||
+                            "No contextual insights available."}
                         </Typography>
                       </Box>
 
                       <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 700, mb: 1 }}
+                        >
                           Baseline & Anomalies
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-                          {python.differences || llm.differences || "This is the first recorded run; no baseline exists."}
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            p: 2,
+                            bgcolor: "grey.50",
+                            borderRadius: 1,
+                            border: "1px solid",
+                            borderColor: "divider",
+                          }}
+                        >
+                          {python.differences ||
+                            llm.differences ||
+                            "This is the first recorded run; no baseline exists."}
                         </Typography>
                       </Box>
 
                       {llm.pii_inspection && (
                         <Box>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{ fontWeight: 700, mb: 1 }}
+                          >
                             PII Data Inspection
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              p: 2,
+                              bgcolor: "grey.50",
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          >
                             {llm.pii_inspection}
                           </Typography>
                         </Box>
                       )}
 
-                      {(llm.recommendations?.length > 0 || python.findings?.length > 0) && (
+                      {(llm.recommendations?.length > 0 ||
+                        python.findings?.length > 0) && (
                         <Box>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'primary.main' }}>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontWeight: 700,
+                              mb: 1,
+                              color: "primary.main",
+                            }}
+                          >
                             Actionable Recommendations
                           </Typography>
-                          <Box sx={{ p: 2, bgcolor: 'primary.50', borderRadius: 1, border: '1px solid', borderColor: 'primary.100' }}>
+                          <Box
+                            sx={{
+                              p: 2,
+                              bgcolor: "primary.50",
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: "primary.100",
+                            }}
+                          >
                             <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
-                              { (llm.recommendations || []).concat(python.findings || []).map((rec, idx) => (
-                                <li key={idx}>
-                                  <Typography variant="body2" color="text.primary" sx={{ fontWeight: 500 }}>
-                                    {rec}
-                                  </Typography>
-                                </li>
-                              ))}
+                              {(llm.recommendations || [])
+                                .concat(python.findings || [])
+                                .map((rec, idx) => (
+                                  <li key={idx}>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.primary"
+                                      sx={{ fontWeight: 500 }}
+                                    >
+                                      {rec}
+                                    </Typography>
+                                  </li>
+                                ))}
                             </ul>
                           </Box>
-                        )}
+                        </Box>
+                      )}
                     </Stack>
                   </Box>
                 );
