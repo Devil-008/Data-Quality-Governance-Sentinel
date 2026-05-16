@@ -1,10 +1,10 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://127.0.0.1:3008",
+  baseURL: import.meta.env.VITE_API_URL || "http://122.163.121.176:3008",
   timeout: 120000,
 });
-// http://122.163.121.176:3008
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {

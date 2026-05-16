@@ -1,5 +1,5 @@
 """
-Connector Controller — CRUD + test + dataset scan + AUTO quality check on create.
+Connector Controller —  CRUD + test + dataset scan + AUTO quality check on create.
 
 FLOW (ADF / Databricks):
   1. POST /test-connection  -> validates Tier-1 creds AND returns a preview
