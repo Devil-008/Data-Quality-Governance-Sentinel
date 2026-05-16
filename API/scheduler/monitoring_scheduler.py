@@ -10,7 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from database.db_connection import fetch_all, execute
 from utils.common import logger
-from controllers.monitoring_controller import _run_scan, quality_check  # noqa: F401
+# from controllers.monitoring_controller import _run_scan, quality_check  # noqa: F401
 
 _scheduler: BackgroundScheduler | None = None
 _lock = threading.Lock()

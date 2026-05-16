@@ -301,23 +301,60 @@ const Dashboard = () => {
 
             <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid', borderColor: 'divider' }}>
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Monitoring Stream</Typography>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Monitoring Stream</Typography>
+                  <Button 
+                    size="small" 
+                    onClick={() => navigate('/data-quality-history')} 
+                    sx={{ textTransform: 'none', fontWeight: 600 }}
+                  >
+                    View All
+                  </Button>
+                </Stack>
                 <Stack spacing={2}>
                   {recentActivity.length === 0 ? (
                     <Typography color="text.secondary" variant="body2" sx={{ textAlign: 'center' }}>
                       No recent activity.
                     </Typography>
                   ) : (
-                    recentActivity.slice(0, 4).map((r) => (
+                    recentActivity.slice(0, 5).map((r) => (
                       <Box key={r.id} sx={{ display: 'flex', alignItems: 'start', gap: 2 }}>
                         <Avatar sx={{ width: 32, height: 32, bgcolor: r.status === 'success' ? 'success.light' : 'error.light', fontSize: '0.75rem' }}>
                           {r.run_type?.charAt(0).toUpperCase()}
                         </Avatar>
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{r.run_type} for {r.connector_name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(r.started_at).toLocaleString()} • {r.status}
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                              {r.dataset_name || r.connector_name}
+                            </Typography>
+                            <Chip 
+                              label={r.run_type} 
+                              size="small" 
+                              sx={{ 
+                                height: 18, 
+                                fontSize: '0.65rem', 
+                                textTransform: 'uppercase', 
+                                fontWeight: 700,
+                                bgcolor: 'primary.light',
+                                color: 'primary.dark',
+                                border: 'none'
+                              }} 
+                            />
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                            {r.connector_name} • {new Date(r.started_at).toLocaleString()}
                           </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                            <Box sx={{ 
+                              width: 6, 
+                              height: 6, 
+                              borderRadius: '50%', 
+                              bgcolor: r.status === 'success' ? 'success.main' : 'error.main' 
+                            }} />
+                            <Typography variant="caption" sx={{ fontWeight: 500, color: r.status === 'success' ? 'success.main' : 'error.main' }}>
+                              {r.status}
+                            </Typography>
+                          </Box>
                         </Box>
                       </Box>
                     ))

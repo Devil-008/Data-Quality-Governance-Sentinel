@@ -19,30 +19,42 @@ from controllers.github_controller import router as github_router
 from controllers.ai_controller import router as ai_router
 from controllers.settings_controller import router as settings_router
 from controllers.rule_book_controller import router as rule_book_router
-from scheduler.monitoring_scheduler import start_scheduler, shutdown_scheduler
-from scheduler.quality_check_scheduler import start as start_quality_check_scheduler
-from scheduler.quality_check_scheduler import stop as stop_quality_check_scheduler
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from utils.scheduler import start_scheduler, shutdown_scheduler
+
+# from scheduler.monitoring_scheduler import start_scheduler, shutdown_scheduler
+# from scheduler.quality_check_scheduler import start as start_quality_check_scheduler
+# from scheduler.quality_check_scheduler import stop as stop_quality_check_scheduler
 from utils.common import logger
 
 load_dotenv()
 
 
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     logger.info("DQ Sentinel starting up...")
+#     start_scheduler()
+#     start_quality_check_scheduler()
+#     yield
+#     shutdown_scheduler()
+#     stop_quality_check_scheduler()
+#     logger.info("DQ Sentinel shutting down...")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("DQ Sentinel starting up...")
+    # ---- STARTUP ----
     start_scheduler()
-    start_quality_check_scheduler()
     yield
+    # ---- SHUTDOWN ----
     shutdown_scheduler()
-    stop_quality_check_scheduler()
-    logger.info("DQ Sentinel shutting down...")
 
 
 app = FastAPI(
     title="DQ Sentinel — Enterprise Data Observability Platform",
     version="1.0.0",
     description="AI-powered data quality, governance, and cloud monitoring.",
-    lifespan=lifespan,
+    lifespan=lifespan
 )
 
 # origins = [
@@ -61,7 +73,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"app": "DQ Sentinel", "status": "running", "version": "1.0.0"}
+    return {"app": "DQ Sentinel", "status": "running", "version": "1.0.1-DEBUG"}
 
 
 @app.get("/health")
@@ -91,6 +103,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host=os.getenv("APP_HOST", "0.0.0.0"),
-        port=int(os.getenv("APP_PORT", "8000")),
-        reload=False,
+        port=int(os.getenv("APP_PORT", "3008")),
+        reload=True,
     )

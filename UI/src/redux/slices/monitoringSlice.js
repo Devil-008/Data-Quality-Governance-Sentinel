@@ -19,13 +19,9 @@ export const fetchJobs = createAsyncThunk(
 
 export const fetchRuns = createAsyncThunk(
   'monitoring/runs',
-  async (limit = 50, { rejectWithValue, getState }) => {
-    const { monitoring } = getState()
-    if (monitoring.runs.length > 0) {
-      return monitoring.runs
-    }
+  async ({ limit = 50, offset = 0 } = {}, { rejectWithValue }) => {
     try {
-      const res = await api.get('/api/monitoring/runs', { params: { limit } })
+      const res = await api.get('/api/monitoring/runs', { params: { limit, offset } })
       return res.data
     } catch (e) {
       return rejectWithValue(e.response?.data?.detail || 'Failed to load runs')
@@ -59,7 +55,14 @@ export const deleteJob = createAsyncThunk(
 
 const slice = createSlice({
   name: 'monitoring',
-  initialState: { jobs: [], runs: [], loading: false, error: null },
+  initialState: { 
+    jobs: [], 
+    runs: [], 
+    total: 0, 
+    stats: { total: 0, success: 0, failed: 0, pii: 0, low_quality: 0 },
+    loading: false, 
+    error: null 
+  },
   reducers: {
     clearError(state) { state.error = null; },
   },
@@ -67,7 +70,16 @@ const slice = createSlice({
     b.addCase(fetchJobs.pending, (s) => { s.loading = true; })
      .addCase(fetchJobs.fulfilled, (s, a) => { s.loading = false; s.jobs = a.payload; })
      .addCase(fetchJobs.rejected, (s) => { s.loading = false; })
-     .addCase(fetchRuns.fulfilled, (s, a) => { s.runs = a.payload; })
+     
+     .addCase(fetchRuns.pending, (s) => { s.loading = true; })
+     .addCase(fetchRuns.fulfilled, (s, a) => { 
+        s.loading = false; 
+        s.runs = a.payload.runs; 
+        s.total = a.payload.total;
+        s.stats = a.payload.stats;
+      })
+     .addCase(fetchRuns.rejected, (s) => { s.loading = false; })
+
      .addCase(createJob.fulfilled, (s) => { /* refetch via component */ })
      .addCase(createJob.rejected, (s, a) => { s.error = a.payload; })
      .addCase(deleteJob.fulfilled, (s, a) => { s.jobs = s.jobs.filter((j) => j.id !== a.payload); });

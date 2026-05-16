@@ -27,6 +27,7 @@ import {
   AccordionSummary,
   AccordionDetails,
   Pagination,
+  Tooltip,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CloseIcon from "@mui/icons-material/Close";
@@ -193,7 +194,7 @@ const Datasets = () => {
 
       <Card>
         <CardContent>
-          {loading && (!allDatasets || allDatasets.length === 0) ? (
+          {loading ? (
             <Loader label="Loading datasets..." />
           ) : (
             <>
@@ -351,13 +352,32 @@ const Datasets = () => {
                               <TableCell sx={{ fontWeight: 600 }}>Connector Type</TableCell>
                               <TableCell>{profile.dataset.connector_type || "N/A"}</TableCell>
                             </TableRow>
+                            {profile.dataset.linked_service_name && (
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 600 }}>Linked Service</TableCell>
+                                <TableCell>{profile.dataset.linked_service_name}</TableCell>
+                              </TableRow>
+                            )}
+                            {profile.dataset.source_system_type && (
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 600 }}>Source System</TableCell>
+                                <TableCell>{profile.dataset.source_system_type}</TableCell>
+                              </TableRow>
+                            )}
                             <TableRow>
                               <TableCell sx={{ fontWeight: 600 }}>Row Count</TableCell>
-                              <TableCell>{profile.dataset.row_count ?? "N/A"}</TableCell>
+                              <TableCell>
+                                {(() => {
+                                  const count = profile.dataset.row_count ?? profile.python_result?.row_count ?? profile.python_result?.summary?.row_count;
+                                  return count != null ? Number(count).toLocaleString() : "N/A";
+                                })()}
+                              </TableCell>
                             </TableRow>
                             <TableRow>
                               <TableCell sx={{ fontWeight: 600 }}>Column Count</TableCell>
-                              <TableCell>{profile.dataset.column_count ?? (profile.columns?.length || 0)}</TableCell>
+                              <TableCell>
+                                {profile.dataset.column_count || profile.python_result?.column_count || profile.python_result?.columns_scanned || (profile.columns?.length || 0)}
+                              </TableCell>
                             </TableRow>
                           </TableBody>
                         </Table>
@@ -366,70 +386,132 @@ const Datasets = () => {
 
                     {/* Technical Discovery & Schema */}
                     {(() => {
-                      let techContext = null;
+                      let tables = [];
+                      let sourceKind = 'table';
                       try {
-                        const profilingJson = profile.dataset.profiling_json ? JSON.parse(profile.dataset.profiling_json) : null;
-                        techContext = profilingJson?.profile?.summary?.technical_context;
+                        const pj = profile.dataset.profiling_json ? JSON.parse(profile.dataset.profiling_json) : null;
+                        const discoveryContext = pj?.profile?.summary?.technical_context || pj?.profile?.summary || pj;
+                        
+                        // Priority 1: python_result from the last quality scan
+                        if (profile.python_result?.table_info) {
+                           const ti = profile.python_result.table_info;
+                           tables = [{
+                             table_name:   ti.table_name,
+                             schema:       ti.schema,
+                             column_count: ti.column_count,
+                             columns:      ti.columns,
+                             primary_keys: ti.primary_keys,
+                             foreign_keys: ti.foreign_keys
+                           }];
+                           sourceKind = discoveryContext?.source_kind || 'table';
+                        } 
+                        // Priority 2: initial discovery context
+                        else if (discoveryContext?.tables) {
+                          tables = discoveryContext.tables;
+                          sourceKind = discoveryContext.source_kind || 'table';
+                        }
                       } catch (e) {
-                        console.error("Error parsing profiling_json", e);
+                        console.error("Error parsing profiling metadata", e);
                       }
 
-                      if (!techContext || !techContext.tables || techContext.tables.length === 0) return null;
+                      if (tables.length === 0) return null;
 
                       return (
                         <Box sx={{ mb: 3 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                             <span role="img" aria-label="discovery">🔎</span> Technical Discovery & Schema
                           </Typography>
-                          {techContext.tables.map((table, tidx) => (
-                            <Box key={tidx} sx={{ mb: 2 }}>
-                              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
-                                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                                  <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                                      {table.table_name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      Schema: {table.schema || 'N/A'} · Source Kind: {techContext.source_kind || 'table'}
-                                    </Typography>
-                                  </Box>
-                                  <Chip 
-                                    label={`${table.column_count || 0} Columns`} 
-                                    size="small" 
-                                    sx={{ fontWeight: 600, bgcolor: 'white' }} 
-                                  />
-                                </Stack>
+                          {tables.map((table, tidx) => {
+                            const pkSet = new Set(table.primary_keys || []);
+                            const fkMap = new Map((table.foreign_keys || []).map(f => [f.column, f]));
 
-                                <TableContainer component={Paper} sx={{ maxHeight: 300, boxShadow: 'none', border: '1px solid', borderColor: 'divider' }}>
-                                  <Table size="small" stickyHeader>
-                                    <TableHead>
-                                      <TableRow>
-                                        <TableCell sx={{ fontWeight: 700, bgcolor: 'white', fontSize: '0.75rem' }}>Column Name</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, bgcolor: 'white', fontSize: '0.75rem' }}>Data Type</TableCell>
-                                      </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                      {(table.columns || []).map((col, cidx) => (
-                                        <TableRow key={cidx} hover>
-                                          <TableCell sx={{ fontSize: '0.75rem', py: 0.5, fontFamily: 'monospace' }}>
-                                            {col.name}
-                                          </TableCell>
-                                          <TableCell sx={{ fontSize: '0.7rem', py: 0.5 }}>
-                                            <Chip 
-                                              label={col.type} 
-                                              size="small" 
-                                              variant="outlined" 
-                                              sx={{ height: 18, fontSize: '0.6rem', color: 'text.secondary' }} 
-                                            />
-                                          </TableCell>
+                            return (
+                              <Box key={tidx} sx={{ mb: 2 }}>
+                                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                                    <Box>
+                                      <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                                        {table.table_name}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        Schema: {table.schema || 'N/A'} · Source Kind: {sourceKind}
+                                      </Typography>
+                                    </Box>
+                                    <Chip 
+                                      label={`${table.column_count || table.columns?.length || 0} Columns`} 
+                                      size="small" 
+                                      sx={{ fontWeight: 600, bgcolor: 'white' }} 
+                                    />
+                                  </Stack>
+
+                                  <TableContainer component={Paper} sx={{ maxHeight: 300, boxShadow: 'none', border: '1px solid', borderColor: 'divider' }}>
+                                    <Table size="small" stickyHeader>
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell sx={{ fontWeight: 700, bgcolor: 'white', fontSize: '0.75rem' }}>Column Name</TableCell>
+                                          <TableCell sx={{ fontWeight: 700, bgcolor: 'white', fontSize: '0.75rem' }}>Data Type</TableCell>
+                                          <TableCell sx={{ fontWeight: 700, bgcolor: 'white', fontSize: '0.75rem' }}>Keys</TableCell>
                                         </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </TableContainer>
-                              </Paper>
-                            </Box>
-                          ))}
+                                      </TableHead>
+                                      <TableBody>
+                                        {(table.columns || []).map((col, cidx) => {
+                                          const isPk = pkSet.has(col.name) || col.is_pk;
+                                          const fk = fkMap.get(col.name);
+                                          
+                                          return (
+                                            <TableRow key={cidx} hover>
+                                              <TableCell sx={{ fontSize: '0.75rem', py: 0.5, fontFamily: 'monospace' }}>
+                                                {col.name}
+                                              </TableCell>
+                                              <TableCell sx={{ fontSize: '0.7rem', py: 0.5 }}>
+                                                <Chip 
+                                                  label={col.type} 
+                                                  size="small" 
+                                                  variant="outlined" 
+                                                  sx={{ height: 18, fontSize: '0.6rem', color: 'text.secondary' }} 
+                                                />
+                                              </TableCell>
+                                              <TableCell sx={{ py: 0.5 }}>
+                                                <Stack direction="row" spacing={0.5}>
+                                                  {isPk && (
+                                                    <Chip label="PK" size="small" color="primary" sx={{ height: 16, fontSize: '0.6rem', fontWeight: 800 }} />
+                                                  )}
+                                                  {fk && (
+                                                    <Tooltip title={`References ${fk.ref_table}(${fk.ref_column})`}>
+                                                      <Chip label="FK" size="small" color="secondary" sx={{ height: 16, fontSize: '0.6rem', fontWeight: 800 }} />
+                                                    </Tooltip>
+                                                  )}
+                                                </Stack>
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+
+                                  {(table.foreign_keys && table.foreign_keys.length > 0) && (
+                                    <Box sx={{ mt: 2 }}>
+                                      <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block' }}>
+                                        Foreign Key Constraints
+                                      </Typography>
+                                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                                        {table.foreign_keys.map((f, fidx) => (
+                                          <Chip 
+                                            key={fidx}
+                                            label={`${f.column} ➔ ${f.ref_table}(${f.ref_column})`}
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ fontSize: '0.65rem', bgcolor: 'white' }}
+                                          />
+                                        ))}
+                                      </Stack>
+                                    </Box>
+                                  )}
+                                </Paper>
+                              </Box>
+                            );
+                          })}
                         </Box>
                       );
                     })()}

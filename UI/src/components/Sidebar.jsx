@@ -25,7 +25,7 @@ const items = [
   { label: 'Connectors', icon: <HubIcon />, path: '/connectors' },
   { label: 'Datasets', icon: <StorageIcon />, path: '/datasets' },
   { label: 'Rule Books', icon: <DescriptionIcon />, path: '/rule-books' },
-  { label: 'Monitoring', icon: <MonitorHeartIcon />, path: '/monitoring' },
+  // { label: 'Monitoring', icon: <MonitorHeartIcon />, path: '/monitoring' },
   { label: 'Data Quality History', icon: <RuleIcon />, path: '/data-quality-history' },
   { label: 'Alerts', icon: <NotificationsActiveIcon />, path: '/alerts' },
   { label: 'Notifications', icon: <NotificationsIcon />, path: '/notifications' },

@@ -9,11 +9,12 @@ This scheduler runs every 10 minutes and:
 
 import datetime
 import threading
+import json
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from database.db_connection import fetch_all, execute, fetch_one
 from utils.common import logger
-from controllers.monitoring_controller import _run_ai_quality_checks
+# from controllers.monitoring_controller import _run_ai_quality_checks
 from utils.email_helper import send_alert_email
 
 _scheduler: BackgroundScheduler | None = None
@@ -71,16 +72,16 @@ def _process_unchecked_datasets():
                 )
 
                 # Run AI quality checks
-                issues, quality_score, _, pii_columns, pii_categories = (
-                    _run_ai_quality_checks(dataset_id, dataset, sample_rows=None)
-                )
+                ai_res = _run_ai_quality_checks(dataset_id, dataset, sample_rows=None)
+                quality_score = ai_res.get("quality_score", 100.0)
+                summary = ai_res.get("summary", "Check completed")
+                pii_categories = [c for c in ai_res.get("pii_detected", []) if c != "NA"]
 
                 logger.info(
-                    "AI checks returned: dataset=%d, score=%.1f, issues=%d, pii_cats=%s",
+                    "AI checks returned: dataset=%d, score=%.1f, status=%s",
                     dataset_id,
                     quality_score,
-                    len(issues),
-                    pii_categories,
+                    ai_res.get("status"),
                 )
 
                 # Format PII categories
@@ -90,24 +91,25 @@ def _process_unchecked_datasets():
                 # Update dataset with quality score and PII info
                 now = datetime.datetime.utcnow()
                 execute(
-                    "UPDATE datasets SET quality_score=%s, pii_categories=%s, contains_pii=%s, last_profiled_at=%s WHERE id=%s",
-                    (quality_score, pii_cats_str, contains_pii, now, dataset_id),
+                    "UPDATE datasets SET quality_score=%s, pii_categories=%s, contains_pii=%s, last_profiled_at=%s, ai_analysis_json=%s WHERE id=%s",
+                    (quality_score, pii_cats_str, contains_pii, now, json.dumps(ai_res), dataset_id),
                 )
 
                 logger.info(
-                    "Quality check completed for dataset %d: score=%.1f, pii=%s",
+                    "Quality check completed for dataset %d: score=%.1f",
                     dataset_id,
                     quality_score,
-                    pii_cats_str or "none",
                 )
 
                 # Create alerts if needed
-                if quality_score < 70:
+                if quality_score < 85:
                     # Quality alert
+                    severity = ai_res.get("severity", "medium")
                     alert_title = f"Quality issues on {dataset['dataset_name']} (score {quality_score})"
-                    alert_msg = f"Score: {quality_score}\n" + "\n".join(
-                        issues[:3]
-                    )  # First 3 issues
+                    failed_rules = ai_res.get("failed_rules", [])
+                    alert_msg = f"Score: {quality_score}\nSummary: {summary}\n"
+                    if failed_rules:
+                        alert_msg += "Failed Rules: " + "; ".join([f"{r.get('rule_type')}: {r.get('reason')}" for r in failed_rules[:3]])
 
                     try:
                         execute(
@@ -117,7 +119,7 @@ def _process_unchecked_datasets():
                                 dataset["connector_id"],
                                 dataset_id,
                                 "quality",
-                                "medium" if quality_score >= 60 else "high",
+                                severity,
                                 alert_title,
                                 alert_msg,
                                 "open",
@@ -130,7 +132,7 @@ def _process_unchecked_datasets():
                 # Create PII alert if PII detected
                 if pii_categories:
                     alert_title = f"PII detected in {dataset['dataset_name']}"
-                    alert_msg = f"Detected PII categories: {', '.join(pii_categories)}\nColumns: {', '.join(pii_columns[:5])}"
+                    alert_msg = f"Detected PII categories: {', '.join(pii_categories)}"
 
                     try:
                         execute(

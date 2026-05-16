@@ -3,7 +3,7 @@ import {
   Box, Typography, Container, Paper, Chip, IconButton, Tooltip,
   ToggleButton, ToggleButtonGroup, TextField, MenuItem, Stack,
   Avatar, Collapse, Divider, Badge, LinearProgress, Button,
-  useTheme, alpha, CircularProgress, Grid,
+  useTheme, alpha, CircularProgress, Grid, Pagination,
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchRuns } from '../../redux/slices/monitoringSlice';
@@ -175,6 +175,13 @@ function TimelineNode({ run, isLast, groupDate }) {
           )}
 
           <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
+            {run.repeat_count > 1 && (
+              <Chip
+                label={`${run.repeat_count} identical runs`}
+                size="small"
+                sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: 'action.hover', color: 'text.secondary', border: '1px dashed divider' }}
+              />
+            )}
             <PiiFlag pii={run.pii_percentage > 0} />
             {run.quality_score != null && (
               <Box sx={{ scale: '1.1' }}>
@@ -373,20 +380,21 @@ function DateGroup({ dateLabel, runs }) {
 const DataQualityHistory = () => {
   const dispatch = useDispatch();
   const theme = useTheme();
-  const { runs, loading } = useSelector((s) => s.monitoring);
+  const { runs, total, stats: globalStats, loading } = useSelector((s) => s.monitoring);
   const connectors = useSelector((s) => s.connectors.list);
 
+  const [page, setPage] = useState(1);
   const [filterConnector, setFilterConnector] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchRuns(100));
+    dispatch(fetchRuns({ limit: 50, offset: (page - 1) * 50 }));
     dispatch(fetchConnectors());
-  }, [dispatch]);
+  }, [dispatch, page]);
 
-  // Filtered + grouped runs
+  // Filtered + grouped runs (for current page only)
   const [searchTerm, setSearchTerm] = useState('');
 
   const filtered = useMemo(() => {
@@ -398,20 +406,13 @@ const DataQualityHistory = () => {
       try {
         const metrics = r.metrics_json ? JSON.parse(r.metrics_json) : null;
         const python = metrics?.python || {};
-
         const passed = Number(python?.passed ?? 0);
         const failed = Number(python?.failed ?? 0);
+        if (failed > 0) derivedStatus = 'failed';
+        else if (passed > 0) derivedStatus = 'success';
+      } catch (e) {}
 
-        if (failed > 0) {
-          derivedStatus = 'failed';
-        } else if (passed > 0) {
-          derivedStatus = 'success';
-        }
-      } catch (e) {
-        // ignore parse errors and use original status
-      }
       const matchStatus = !filterStatus || derivedStatus === filterStatus;
-      
       const searchStr = searchTerm.toLowerCase();
       const matchSearch = !searchTerm || 
         (r.connector_name?.toLowerCase().includes(searchStr)) ||
@@ -422,10 +423,28 @@ const DataQualityHistory = () => {
     });
   }, [runs, filterConnector, filterType, filterStatus, searchTerm]);
 
-  // Group by date
+  // Group by date + Deduplicate identical consecutive runs
   const grouped = useMemo(() => {
     const groups = {};
-    filtered.forEach((r) => {
+    const sorted = [...filtered].sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
+    const processed = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const current = sorted[i];
+      const next = sorted[i + 1];
+      if (next && current.dataset_id === next.dataset_id && current.quality_score === next.quality_score && current.status === next.status && current.connector_id === next.connector_id) {
+        let count = 1;
+        let j = i;
+        while (j + 1 < sorted.length && sorted[j].dataset_id === sorted[j+1].dataset_id && sorted[j].quality_score === sorted[j+1].quality_score && sorted[j].status === sorted[j+1].status) {
+          count++;
+          j++;
+        }
+        processed.push({ ...current, repeat_count: count });
+        i = j;
+      } else {
+        processed.push(current);
+      }
+    }
+    processed.forEach((r) => {
       const d = r.started_at ? format(new Date(r.started_at), 'MMM dd, yyyy') : 'Unknown date';
       if (!groups[d]) groups[d] = [];
       groups[d].push(r);
@@ -433,55 +452,8 @@ const DataQualityHistory = () => {
     return groups;
   }, [filtered]);
 
-  // Stats
-  const stats = useMemo(() => {
-    const getDerivedStatus = (r) => {
-      try {
-        const metrics = r.metrics_json ? JSON.parse(r.metrics_json) : null;
-        const python = metrics?.python || {};
-
-        const passed = Number(python?.passed ?? 0);
-        const failed = Number(python?.failed ?? 0);
-
-        if (failed > 0) return 'failed';
-        if (passed > 0) return 'success';
-
-        return (r.status || 'success').toLowerCase();
-      } catch {
-        return (r.status || 'success').toLowerCase();
-      }
-    };
-
-    const total = filtered.length;
-
-    const success = filtered.filter(
-      (r) => getDerivedStatus(r) === 'success'
-    ).length;
-
-    const failed = filtered.filter(
-      (r) => getDerivedStatus(r) === 'failed'
-    ).length;
-
-    const pii = filtered.filter(
-      (r) => r.pii_percentage > 0
-    ).length;
-
-    const lowQ = filtered.filter(
-      (r) =>
-        r.quality_score != null &&
-        r.quality_score < 50
-    ).length;
-
-    return {
-      total,
-      success,
-      failed,
-      pii,
-      lowQ,
-    };
-  }, [filtered]);
-
   const activeFilters = [filterConnector, filterType, filterStatus].filter(Boolean).length;
+  const pageCount = Math.ceil(total / 50);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -499,7 +471,7 @@ const DataQualityHistory = () => {
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <TextField
-              placeholder="Search history..."
+              placeholder="Search page..."
               size="small"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -522,44 +494,46 @@ const DataQualityHistory = () => {
               </Badge>
             </Tooltip>
             <Tooltip title="Refresh">
-              <IconButton
-                onClick={() => dispatch(fetchRuns(100))}
-                disabled={loading}
-                sx={{ border: `1px solid ${theme.palette.divider}` }}
-              >
-                {loading ? <CircularProgress size={18} /> : <RefreshIcon />}
-              </IconButton>
+              <span>
+                <IconButton
+                  onClick={() => dispatch(fetchRuns({ limit: 50, offset: (page - 1) * 50 }))}
+                  disabled={loading}
+                  sx={{ border: `1px solid ${theme.palette.divider}` }}
+                >
+                  {loading ? <CircularProgress size={18} /> : <RefreshIcon />}
+                </IconButton>
+              </span>
             </Tooltip>
           </Stack>
         </Box>
 
-        {/* Stat pills */}
-        <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
+        {/* Global Stat pills */}
+        <Stack direction="row" spacing={1} sx={{ mb: 4, flexWrap: 'wrap', gap: 1.5 }}>
           {[
-            { label: 'Total Runs', value: stats.total, color: '#6366f1' },
-            { label: 'Success', value: stats.success, color: '#16a34a' },
-            { label: 'Failed', value: stats.failed, color: '#dc2626' },
-            { label: 'PII Detected', value: stats.pii, color: '#f43f5e' },
-            { label: 'Quality < 50%', value: stats.lowQ, color: '#d97706' },
+            { label: 'Total Runs', value: globalStats.total, color: '#6366f1' },
+            { label: 'Success', value: globalStats.success, color: '#16a34a' },
+            { label: 'Failed', value: globalStats.failed, color: '#dc2626' },
+            { label: 'PII Detected', value: globalStats.pii, color: '#f43f5e' },
+            { label: 'Quality < 50%', value: globalStats.low_quality, color: '#d97706' },
           ].map((s) => (
             <Paper
               key={s.label}
               variant="outlined"
-              sx={{ px: 2, py: 0.75, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1, borderColor: alpha(s.color, 0.3) }}
+              sx={{ px: 2.5, py: 1.25, borderRadius: 3, display: 'flex', flexDirection: 'column', minWidth: 120, borderColor: alpha(s.color, 0.2), bgcolor: alpha(s.color, 0.02) }}
             >
-              <Typography sx={{ fontSize: 18, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</Typography>
-              <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{s.label}</Typography>
+              <Typography sx={{ fontSize: 24, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</Typography>
+              <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', mt: 0.5 }}>{s.label}</Typography>
             </Paper>
           ))}
         </Stack>
 
         {/* Filters */}
         <Collapse in={showFilters}>
-          <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Paper variant="outlined" sx={{ p: 2.5, mb: 4, borderRadius: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', bgcolor: alpha(theme.palette.action.hover, 0.3) }}>
             <TextField
               select label="Connector" size="small" value={filterConnector}
               onChange={(e) => setFilterConnector(e.target.value)}
-              sx={{ minWidth: 180 }}
+              sx={{ minWidth: 200 }}
             >
               <MenuItem value="">All Connectors</MenuItem>
               {connectors.map((c) => (
@@ -569,7 +543,7 @@ const DataQualityHistory = () => {
             <TextField
               select label="Run Type" size="small" value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              sx={{ minWidth: 140 }}
+              sx={{ minWidth: 160 }}
             >
               <MenuItem value="">All Types</MenuItem>
               <MenuItem value="quality">Quality</MenuItem>
@@ -579,7 +553,7 @@ const DataQualityHistory = () => {
             <TextField
               select label="Status" size="small" value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              sx={{ minWidth: 130 }}
+              sx={{ minWidth: 160 }}
             >
               <MenuItem value="">All Statuses</MenuItem>
               <MenuItem value="success">Success</MenuItem>
@@ -587,26 +561,53 @@ const DataQualityHistory = () => {
               <MenuItem value="running">Running</MenuItem>
             </TextField>
             {activeFilters > 0 && (
-              <Button size="small" onClick={() => { setFilterConnector(''); setFilterType(''); setFilterStatus(''); }}>
-                Clear filters
+              <Button variant="text" size="small" onClick={() => { setFilterConnector(''); setFilterType(''); setFilterStatus(''); }}>
+                Clear all filters
               </Button>
             )}
           </Paper>
         </Collapse>
 
         {/* Timeline */}
-        {loading && runs.length === 0 ? (
-          <Loader label="Loading history..." />
+        {loading ? (
+          <Loader label="Fetching history..." />
         ) : filtered.length === 0 ? (
-          <Paper variant="outlined" sx={{ p: 6, textAlign: 'center', borderRadius: 3 }}>
-            <TimelineIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
-            <Typography color="text.secondary">No runs found{activeFilters ? ' for selected filters' : ''}.</Typography>
+          <Paper variant="outlined" sx={{ p: 10, textAlign: 'center', borderRadius: 4, borderStyle: 'dashed' }}>
+            <TimelineIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2, opacity: 0.5 }} />
+            <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 600 }}>No results found</Typography>
+            <Typography variant="body2" color="text.disabled">Try adjusting your filters or search term</Typography>
           </Paper>
         ) : (
-          <Box>
+          <Box sx={{ minHeight: 400 }}>
             {Object.entries(grouped).map(([dateLabel, groupRuns]) => (
               <DateGroup key={dateLabel} dateLabel={dateLabel} runs={groupRuns} />
             ))}
+
+            {/* Pagination Controls */}
+            <Box sx={{ 
+              mt: 6, py: 3, px: 3,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              bgcolor: alpha(theme.palette.action.hover, 0.5),
+              borderRadius: 3, border: `1px solid ${theme.palette.divider}`
+            }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                Showing <b>{filtered.length}</b> of <b>{total}</b> total runs
+              </Typography>
+              <Pagination 
+                count={pageCount} 
+                page={page} 
+                onChange={(e, v) => {
+                  setPage(v);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }} 
+                color="primary"
+                shape="rounded"
+                size="large"
+                sx={{ 
+                  '& .MuiPaginationItem-root': { fontWeight: 700 }
+                }}
+              />
+            </Box>
           </Box>
         )}
       </Box>

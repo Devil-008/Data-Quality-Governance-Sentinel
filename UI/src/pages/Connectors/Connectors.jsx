@@ -41,6 +41,7 @@ import {
   updateConnector,
   clearTestResult,
   testExistingConnector,
+  testDatasetCredentials,
 } from "../../redux/slices/connectorSlice";
 import Loader from "../../components/Loader";
 
@@ -109,7 +110,7 @@ const TYPE_FIELDS = {
 const Connectors = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { list, loading, error, testResult, testLoading } = useSelector(
+  const { list, loading, error, testResult, testLoading, testDatasetLoading } = useSelector(
     (s) => s.connectors,
   );
 
@@ -124,7 +125,9 @@ const Connectors = () => {
   const [search, setSearch] = useState("");
   const [credDialogOpen, setCredDialogOpen] = useState(false);
   const [activeAsset, setActiveAsset] = useState(null);
-  const [assetCreds, setAssetCreds] = useState({}); // { assetName: { field: value } }
+  const [assetCreds, setAssetCreds] = useState({}); // { assetName: { credentials: { field: value }, tested: boolean } }
+  const [assetTestError, setAssetTestError] = useState(null);
+  const [assetTestSuccess, setAssetTestSuccess] = useState(false);
   const fields = TYPE_FIELDS[type] || [];
   // const fields = TYPE_FIELDS[type] || [];
 
@@ -152,6 +155,7 @@ const Connectors = () => {
     setSavingError(null);
     dispatch(clearTestResult());
     setDialogOpen(true);
+    setAssetCreds({});
   };
 
   const openEditDialog = (connector) => {
@@ -163,6 +167,7 @@ const Connectors = () => {
     setSavingError(null);
     dispatch(clearTestResult());
     setDialogOpen(true);
+    setAssetCreds({});
   };
 
   const closeDialog = () => {
@@ -177,19 +182,58 @@ const Connectors = () => {
     // Initialize with existing if any
     setAssetCreds(prev => ({
       ...prev,
-      [asset.name]: prev[asset.name] || {}
+      [asset.name]: prev[asset.name] || { credentials: {}, tested: false }
     }));
+    setAssetTestError(null);
+    setAssetTestSuccess(false);
     setCredDialogOpen(true);
   };
 
   const updateAssetCred = (field, val) => {
+    if (!activeAsset) return;
     setAssetCreds(prev => ({
       ...prev,
       [activeAsset.name]: {
         ...prev[activeAsset.name],
-        [field]: val
+        credentials: {
+          ...prev[activeAsset.name]?.credentials,
+          [field]: val
+        },
+        tested: false // Reset test status on change
       }
     }));
+    setAssetTestError(null);
+    setAssetTestSuccess(false);
+  };
+
+  const handleTestDataset = async () => {
+    setAssetTestError(null);
+    setAssetTestSuccess(false);
+    
+    if (!activeAsset) return;
+    const creds = assetCreds[activeAsset.name]?.credentials || {};
+    const res = await dispatch(testDatasetCredentials({
+      source_system_type: activeAsset.source_system_type,
+      connection_hint: activeAsset.connection_hint,
+      credentials: creds
+    }));
+
+    if (testDatasetCredentials.fulfilled.match(res)) {
+      if (res.payload.ok) {
+        setAssetTestSuccess(true);
+        setAssetCreds(prev => ({
+          ...prev,
+          [activeAsset.name]: {
+            ...prev[activeAsset.name],
+            tested: true
+          }
+        }));
+      } else {
+        setAssetTestError(res.payload.error || "Connection failed");
+      }
+    } else {
+      setAssetTestError(res.payload || "Test failed");
+    }
   };
 
   const updateField = (key, val) => setConfig((c) => ({ ...c, [key]: val }));
@@ -225,8 +269,7 @@ const Connectors = () => {
       }
     }
 
-    const dataset_credentials = Object.entries(assetCreds).map(([name, creds]) => {
-      // Find the original asset metadata from the preview
+    const dataset_credentials = Object.entries(assetCreds).map(([name, data]) => {
       const asset = testResult?.preview?.datasets?.find(d => d.name === name);
       if (!asset) return null;
 
@@ -237,7 +280,7 @@ const Connectors = () => {
         source_system_type: asset.source_system_type,
         linked_service_name: asset.linked_service_name,
         connection_hint: asset.connection_hint || {},
-        credentials: creds
+        credentials: data.credentials
       };
     }).filter(dc => dc && Object.keys(dc.credentials).length > 0);
 
@@ -325,7 +368,7 @@ const Connectors = () => {
 
       <Card>
         <CardContent>
-          {loading && (!list || list.length === 0) ? (
+          {loading ? (
             <Loader label="Loading connectors..." />
           ) : !list || list.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 6 }}>
@@ -560,12 +603,12 @@ const Connectors = () => {
                                 {d.needs_credentials && (
                                   <Button 
                                     size="small" 
-                                    variant={assetCreds[d.name] && Object.keys(assetCreds[d.name]).length > 0 ? "contained" : "outlined"}
-                                    color={assetCreds[d.name] && Object.keys(assetCreds[d.name]).length > 0 ? "success" : "primary"}
+                                    variant={assetCreds[d.name]?.tested ? "contained" : "outlined"}
+                                    color={assetCreds[d.name]?.tested ? "success" : "primary"}
                                     onClick={() => openCredDialog(d)}
                                     sx={{ fontSize: '0.6rem', height: 20, px: 1, minWidth: 0 }}
                                   >
-                                    {assetCreds[d.name] && Object.keys(assetCreds[d.name]).length > 0 ? "Configured" : "Setup"}
+                                    {assetCreds[d.name]?.tested ? "Configured" : "Setup"}
                                   </Button>
                                 )}
                               </TableCell>
@@ -639,10 +682,12 @@ const Connectors = () => {
                 fullWidth
                 size="small"
                 type={field.includes('password') || field.includes('key') || field.includes('token') || field.includes('secret') ? "password" : "text"}
-                value={assetCreds[activeAsset.name]?.[field] || ""}
+                value={activeAsset ? (assetCreds[activeAsset.name]?.credentials?.[field] || "") : ""}
                 onChange={(e) => updateAssetCred(field, e.target.value)}
               />
             ))}
+            {assetTestError && <Alert severity="error" sx={{ py: 0, fontSize: '0.75rem' }}>{assetTestError}</Alert>}
+            {assetTestSuccess && <Alert severity="success" sx={{ py: 0, fontSize: '0.75rem' }}>Connection successful!</Alert>}
             {(!activeAsset?.required_fields || activeAsset.required_fields.length === 0) && (
               <Typography variant="body2" color="text.secondary">
                 No extra credentials required for this asset.
@@ -653,10 +698,18 @@ const Connectors = () => {
         <DialogActions>
           <Button onClick={() => setCredDialogOpen(false)} size="small">Cancel</Button>
           <Button 
+            onClick={handleTestDataset} 
+            disabled={testDatasetLoading}
+            size="small"
+            startIcon={testDatasetLoading && <CircularProgress size={12} />}
+          >
+            Test
+          </Button>
+          <Button 
             onClick={() => setCredDialogOpen(false)} 
             variant="contained" 
             size="small"
-            disabled={activeAsset?.required_fields?.some(f => !assetCreds[activeAsset.name]?.[f])}
+            disabled={!activeAsset || !assetCreds[activeAsset.name]?.tested}
           >
             Done
           </Button>

@@ -3,11 +3,7 @@ import api from '../../api/axios';
 
 export const fetchConnectors = createAsyncThunk(
   'connectors/list',
-  async (_, { rejectWithValue, getState }) => {
-    const { connectors } = getState()
-    if (connectors.list.length > 0 && !connectors.loading) {
-      return connectors.list
-    }
+  async (_, { rejectWithValue }) => {
     try {
       const res = await api.get('/api/connectors/list')
       return res.data
@@ -41,6 +37,18 @@ export const testConnection = createAsyncThunk(
           ? { success: false, message: e.response.data.detail }
           : { success: false, message: 'Connection test failed' },
       );
+    }
+  },
+);
+
+export const testDatasetCredentials = createAsyncThunk(
+  'connectors/testDataset',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await api.post('/api/connectors/test-dataset-credentials', payload);
+      return res.data;
+    } catch (e) {
+      return rejectWithValue(e.response?.data?.detail || 'Dataset connection test failed');
     }
   },
 );
@@ -120,6 +128,7 @@ const slice = createSlice({
     scanResult: null,
     qualityCheckAllResult: null,
     testLoading: false,
+    testDatasetLoading: false,
     scanLoading: false,
     qualityCheckAllLoading: false,
   },
@@ -151,6 +160,9 @@ const slice = createSlice({
      .addCase(scanConnector.pending, (s) => { s.scanLoading = true; s.scanResult = null; })
      .addCase(scanConnector.fulfilled, (s, a) => { s.scanLoading = false; s.scanResult = a.payload; })
      .addCase(scanConnector.rejected, (s, a) => { s.scanLoading = false; s.scanResult = { status: 'failed', error: a.payload }; })
+     .addCase(testDatasetCredentials.pending, (s) => { s.testDatasetLoading = true; })
+     .addCase(testDatasetCredentials.fulfilled, (s, a) => { s.testDatasetLoading = false; })
+     .addCase(testDatasetCredentials.rejected, (s, a) => { s.testDatasetLoading = false; })
      .addCase(qualityCheckAllDatasets.pending, (s) => { s.qualityCheckAllLoading = true; s.qualityCheckAllResult = null; })
      .addCase(qualityCheckAllDatasets.fulfilled, (s, a) => { s.qualityCheckAllLoading = false; s.qualityCheckAllResult = a.payload; })
      .addCase(qualityCheckAllDatasets.rejected, (s, a) => { s.qualityCheckAllLoading = false; s.qualityCheckAllResult = { status: 'failed', error: a.payload }; });

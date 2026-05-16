@@ -16,7 +16,7 @@ def overview(user: dict = Depends(get_current_user)):
           (SELECT COUNT(*) FROM connectors) AS total_connectors,
           (SELECT COUNT(*) FROM connectors WHERE status='Connected') AS healthy_connectors,
           (SELECT COUNT(*) FROM datasets) AS dataset_count,
-          (SELECT COUNT(*) FROM datasets WHERE contains_pii=1) AS pii_datasets,
+          (SELECT COUNT(*) FROM datasets WHERE pii_percentage > 0) AS pii_datasets,
           (SELECT COUNT(*) FROM alerts WHERE severity IN ('critical','high') AND status='open') AS critical_alerts,
           (SELECT COUNT(*) FROM monitoring_jobs WHERE enabled=1) AS monitoring_jobs
         """
@@ -30,8 +30,10 @@ def overview(user: dict = Depends(get_current_user)):
     )
 
     activity = fetch_all(
-        "SELECT r.*, c.name AS connector_name "
-        "FROM monitoring_runs r LEFT JOIN connectors c ON c.id=r.connector_id "
+        "SELECT r.*, c.name AS connector_name, d.dataset_name "
+        "FROM monitoring_runs r "
+        "LEFT JOIN connectors c ON c.id=r.connector_id "
+        "LEFT JOIN datasets d ON d.id=r.dataset_id "
         "ORDER BY r.started_at DESC LIMIT 10"
     )
 
