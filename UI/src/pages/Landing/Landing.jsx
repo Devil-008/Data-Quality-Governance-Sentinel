@@ -88,6 +88,7 @@ const Landing = () => {
     const openLogin = () => {
         try { sessionStorage.removeItem('postLoginRedirect'); } catch { /* ignore */ }
         setLoginOpen(true);
+        navigate('/login');
     };
 
     const closeLogin = () => {
