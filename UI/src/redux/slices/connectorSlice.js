@@ -88,7 +88,8 @@ export const updateConnector = createAsyncThunk(
       const res = await api.put(`/api/connectors/${payload.id}`, { 
         name: payload.name, 
         type: payload.type, 
-        config: payload.config 
+        config: payload.config,
+        dataset_credentials: payload.dataset_credentials
       });
       return res.data;
     } catch (e) {
