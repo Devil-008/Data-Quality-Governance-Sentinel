@@ -34,7 +34,7 @@ const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
 
   // Shared header cell style
   const headerCellSx = {
-    fontSize: "0.875rem",       // 14px — clearly larger than default small
+    fontSize: "20px",       // 14px — clearly larger than default small
     fontWeight: 700,
     color: "text.primary",
     letterSpacing: "0.02em",
@@ -44,7 +44,7 @@ const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
 
   // Shared body cell style
   const bodyCellSx = {
-    fontSize: "0.9125rem",
+    fontSize: "16px",
     fontWeight: 600,
     py: 1.25,
   };
@@ -68,7 +68,10 @@ const DatasetTable = ({ datasets = [], onRowClick, sortConfig, onSort }) => {
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 Connector
                 {sortConfig?.key !== "connector_name" ? (
-                  <UnfoldMoreIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                  <UnfoldMoreIcon
+                    fontSize="small"
+                    sx={{ color: "text.disabled" }}
+                  />
                 ) : sortConfig.direction === "asc" ? (
                   <KeyboardArrowUpIcon fontSize="small" color="primary" />
                 ) : (

@@ -61,7 +61,7 @@ const Datasets = () => {
   const [filters, setFilters] = useState({ connector_id: "", q: "" });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
   const applyFilters = (newFilters) => {
     const params = {};
@@ -75,18 +75,18 @@ const Datasets = () => {
     const updatedFilters = { ...filters, [key]: value };
     setFilters(updatedFilters);
     // applyFilters(updatedFilters);
-     if (key === "connector_id") {
-    applyFilters(updatedFilters);
-  }
+    if (key === "connector_id") {
+      applyFilters(updatedFilters);
+    }
   };
 
   const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    } else if (sortConfig.key === key && sortConfig.direction === "desc") {
       key = null;
-      direction = 'asc';
+      direction = "asc";
     }
     setSortConfig({ key, direction });
   };
@@ -128,15 +128,19 @@ const Datasets = () => {
 
   const sortedDatasets = [...searchedDatasets].sort((a, b) => {
     if (!sortConfig.key) return 0;
-    
-    const valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : "";
-    const valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : "";
+
+    const valA = a[sortConfig.key]
+      ? a[sortConfig.key].toString().toLowerCase()
+      : "";
+    const valB = b[sortConfig.key]
+      ? b[sortConfig.key].toString().toLowerCase()
+      : "";
 
     if (valA < valB) {
-      return sortConfig.direction === 'asc' ? -1 : 1;
+      return sortConfig.direction === "asc" ? -1 : 1;
     }
     if (valA > valB) {
-      return sortConfig.direction === 'asc' ? 1 : -1;
+      return sortConfig.direction === "asc" ? 1 : -1;
     }
     return 0;
   });
@@ -223,7 +227,9 @@ const Datasets = () => {
         anchor="right"
         open={drawerOpen}
         onClose={closeProfile}
-        PaperProps={{ sx: { width: { xs: "100%", md: 720 }, bgcolor: "#ffffff" } }}
+        PaperProps={{
+          sx: { width: { xs: "100%", md: 720 }, bgcolor: "#ffffff" },
+        }}
       >
         <Box sx={{ p: 3 }}>
           <Stack
@@ -245,11 +251,15 @@ const Datasets = () => {
             <Box>
               {/* Header Info */}
               <Box sx={{ mb: 3 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: "primary.main" }}>
+                <Typography
+                  variant="h5"
+                  sx={{ fontWeight: 700, color: "primary.main" }}
+                >
                   {profile.dataset.dataset_name}
                 </Typography>
                 <Typography variant="subtitle2" color="text.secondary">
-                  Source: {profile.dataset.connector_name} · Type: {profile.dataset.dataset_type}
+                  Source: {profile.dataset.connector_name} · Type:{" "}
+                  {profile.dataset.dataset_type}
                 </Typography>
                 <Typography variant="h6" sx={{ mt: 1, fontWeight: 700 }}>
                   Data Quality Score: {profile.dataset.quality_score ?? 0}%
@@ -259,7 +269,7 @@ const Datasets = () => {
               {(() => {
                 const llm = profile.llm_report || {};
                 const python = profile.python_result || {};
-                const isPipeline = profile.dataset.dataset_type === 'pipeline';
+                const isPipeline = profile.dataset.dataset_type === "pipeline";
 
                 const getBarColor = (pct, isOutlier = false) => {
                   if (pct == null) return "grey.300";
@@ -276,21 +286,47 @@ const Datasets = () => {
                 const renderBar = (label, pct) => {
                   const isOutlier = label.toLowerCase().includes("outlier");
                   // For outliers, 0% means 100% health, 100% means 0% health
-                  const displayPct = isOutlier ? Math.max(0, 100 - (pct ?? 0)) : (pct ?? 0);
+                  const displayPct = isOutlier
+                    ? Math.max(0, 100 - (pct ?? 0))
+                    : (pct ?? 0);
                   const color = getBarColor(pct, isOutlier);
 
                   return (
                     <Box sx={{ mb: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          mb: 0.5,
+                        }}
+                      >
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           {label}
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: color }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 700, color: color }}
+                        >
                           {pct != null ? `${pct}%` : "N/A"}
                         </Typography>
                       </Box>
-                      <Box sx={{ height: 8, width: '100%', bgcolor: 'grey.200', borderRadius: 4, overflow: 'hidden' }}>
-                        <Box sx={{ height: '100%', width: `${displayPct}%`, bgcolor: color, transition: 'width 0.5s ease' }} />
+                      <Box
+                        sx={{
+                          height: 8,
+                          width: "100%",
+                          bgcolor: "grey.200",
+                          borderRadius: 4,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            height: "100%",
+                            width: `${displayPct}%`,
+                            bgcolor: color,
+                            transition: "width 0.5s ease",
+                          }}
+                        />
                       </Box>
                     </Box>
                   );
@@ -301,56 +337,138 @@ const Datasets = () => {
                     {/* Metrics Section */}
                     <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
                       {renderBar("Missing Data", llm.missing_data_pct)}
-                      {renderBar("Junk Data (Incorrect Format)", llm.junk_data_pct)}
+                      {renderBar(
+                        "Junk Data (Incorrect Format)",
+                        llm.junk_data_pct,
+                      )}
                       {renderBar("Outliers", llm.outlier_pct)}
                     </Card>
 
                     {/* Trend Section */}
                     <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <span role="img" aria-label="chart">📈</span> Trend Analysis
+                      <Typography
+                        variant="subtitle2"
+                        sx={{
+                          fontWeight: 700,
+                          mb: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
+                      >
+                        <span role="img" aria-label="chart">
+                          📈
+                        </span>{" "}
+                        Trend Analysis
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          p: 2,
+                          bgcolor: "grey.50",
+                          borderRadius: 1,
+                          border: "1px solid",
+                          borderColor: "divider",
+                        }}
+                      >
                         {llm.trend || "No prior runs to compute deviation."}
                       </Typography>
                     </Box>
 
                     {/* Summary Section */}
                     <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{ fontWeight: 700, mb: 1 }}
+                      >
                         Summary
                       </Typography>
-                      
-                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, mb: 0.5 }}
+                      >
                         Technical Summary
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, p: 1.5, bgcolor: 'grey.50', borderRadius: 1, border: '1px border-left', borderLeft: '4px solid', borderLeftColor: 'primary.main' }}>
-                        {python.technical_summary || llm.technical_summary || "No technical summary available."}
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          mb: 2,
+                          p: 1.5,
+                          bgcolor: "grey.50",
+                          borderRadius: 1,
+                          border: "1px border-left",
+                          borderLeft: "4px solid",
+                          borderLeftColor: "primary.main",
+                        }}
+                      >
+                        {python.technical_summary ||
+                          llm.technical_summary ||
+                          "No technical summary available."}
                       </Typography>
 
-                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, mb: 0.5 }}
+                      >
+                        Trend Analysis
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 2 }}
+                      >
+                        {llm.trend || "N/A"}
+                      </Typography>
+
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, mb: 1 }}
+                      >
                         Metadata Overview
                       </Typography>
-                      <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, boxShadow: 'none' }}>
+                      <TableContainer
+                        component={Paper}
+                        variant="outlined"
+                        sx={{ mb: 2, boxShadow: "none" }}
+                      >
                         <Table size="small">
-                          <TableHead sx={{ bgcolor: 'grey.50' }}>
+                          <TableHead sx={{ bgcolor: "grey.50" }}>
                             <TableRow>
-                              <TableCell sx={{ fontWeight: 700 }}>Property</TableCell>
-                              <TableCell sx={{ fontWeight: 700 }}>Value</TableCell>
+                              <TableCell sx={{ fontWeight: 700 }}>
+                                Property
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 700 }}>
+                                Value
+                              </TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>
                             <TableRow>
-                              <TableCell sx={{ fontWeight: 600 }}>Table/Dataset Name</TableCell>
-                              <TableCell>{profile.dataset.dataset_name}</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                Table/Dataset Name
+                              </TableCell>
+                              <TableCell>
+                                {profile.dataset.dataset_name}
+                              </TableCell>
                             </TableRow>
                             <TableRow>
-                              <TableCell sx={{ fontWeight: 600 }}>Schema</TableCell>
-                              <TableCell>{profile.dataset.schema_name || "N/A"}</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                Schema
+                              </TableCell>
+                              <TableCell>
+                                {profile.dataset.schema_name || "N/A"}
+                              </TableCell>
                             </TableRow>
                             <TableRow>
-                              <TableCell sx={{ fontWeight: 600 }}>Connector Type</TableCell>
-                              <TableCell>{profile.dataset.connector_type || "N/A"}</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                Connector Type
+                              </TableCell>
+                              <TableCell>
+                                {profile.dataset.connector_type || "N/A"}
+                              </TableCell>
                             </TableRow>
                             {profile.dataset.linked_service_name && (
                               <TableRow>
@@ -418,8 +536,20 @@ const Datasets = () => {
 
                       return (
                         <Box sx={{ mb: 3 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span role="img" aria-label="discovery">🔎</span> Technical Discovery & Schema
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontWeight: 700,
+                              mb: 1,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <span role="img" aria-label="discovery">
+                              🔎
+                            </span>{" "}
+                            Technical Discovery & Schema
                           </Typography>
                           {tables.map((table, tidx) => {
                             const pkSet = new Set(table.primary_keys || []);
@@ -518,52 +648,133 @@ const Datasets = () => {
 
                     {/* Intelligence Sections */}
                     <Stack spacing={3}>
-                      {isPipeline && (python.run_details?.length > 0) && (
+                      {isPipeline && python.run_details?.length > 0 && (
                         <Box>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'error.main', display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span role="img" aria-label="history">📜</span> Pipeline Execution History
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontWeight: 700,
+                              mb: 1,
+                              color: "error.main",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <span role="img" aria-label="history">
+                              📜
+                            </span>{" "}
+                            Pipeline Execution History
                           </Typography>
-                          <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, maxHeight: 400, overflow: 'auto' }}>
+                          <TableContainer
+                            component={Paper}
+                            variant="outlined"
+                            sx={{ mb: 2, maxHeight: 400, overflow: "auto" }}
+                          >
                             <Table size="small" stickyHeader>
                               <TableHead>
                                 <TableRow>
-                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Status</TableCell>
-                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Run Start</TableCell>
-                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Duration</TableCell>
-                                  <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Reason/Solution</TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: "grey.100",
+                                    }}
+                                  >
+                                    Status
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: "grey.100",
+                                    }}
+                                  >
+                                    Run Start
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: "grey.100",
+                                    }}
+                                  >
+                                    Duration
+                                  </TableCell>
+                                  <TableCell
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: "grey.100",
+                                    }}
+                                  >
+                                    Reason/Solution
+                                  </TableCell>
                                 </TableRow>
                               </TableHead>
                               <TableBody>
                                 {python.run_details.map((run, idx) => (
                                   <TableRow key={idx} hover>
                                     <TableCell>
-                                      <Chip 
-                                        label={run.status} 
-                                        size="small" 
-                                        color={run.status === 'SUCCESS' ? 'success' : run.status === 'FAILED' ? 'error' : 'warning'}
-                                        sx={{ fontWeight: 600, height: 20, fontSize: '0.65rem' }}
+                                      <Chip
+                                        label={run.status}
+                                        size="small"
+                                        color={
+                                          run.status === "SUCCESS"
+                                            ? "success"
+                                            : run.status === "FAILED"
+                                              ? "error"
+                                              : "warning"
+                                        }
+                                        sx={{
+                                          fontWeight: 600,
+                                          height: 20,
+                                          fontSize: "0.65rem",
+                                        }}
                                       />
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.75rem' }}>
-                                      {run.run_start ? new Date(run.run_start).toLocaleString() : '-'}
+                                    <TableCell sx={{ fontSize: "0.75rem" }}>
+                                      {run.run_start
+                                        ? new Date(
+                                            run.run_start,
+                                          ).toLocaleString()
+                                        : "-"}
                                     </TableCell>
-                                    <TableCell sx={{ fontSize: '0.75rem' }}>
-                                      {run.duration_minutes ? `${run.duration_minutes}m` : '-'}
+                                    <TableCell sx={{ fontSize: "0.75rem" }}>
+                                      {run.duration_minutes
+                                        ? `${run.duration_minutes}m`
+                                        : "-"}
                                     </TableCell>
                                     <TableCell>
-                                      {run.status === 'FAILED' && (
+                                      {run.status === "FAILED" && (
                                         <Box>
-                                          <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, display: 'block' }}>
+                                          <Typography
+                                            variant="caption"
+                                            sx={{
+                                              color: "error.main",
+                                              fontWeight: 600,
+                                              display: "block",
+                                            }}
+                                          >
                                             {run.failure_reason}
                                           </Typography>
                                           {run.recommended_solution && (
-                                            <Typography variant="caption" sx={{ color: 'primary.main', fontStyle: 'italic' }}>
+                                            <Typography
+                                              variant="caption"
+                                              sx={{
+                                                color: "primary.main",
+                                                fontStyle: "italic",
+                                              }}
+                                            >
                                               Fix: {run.recommended_solution}
                                             </Typography>
                                           )}
                                         </Box>
                                       )}
-                                      {run.status === 'SUCCESS' && <Typography variant="caption" color="text.secondary">Success</Typography>}
+                                      {run.status === "SUCCESS" && (
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                        >
+                                          Success
+                                        </Typography>
+                                      )}
                                     </TableCell>
                                   </TableRow>
                                 ))}
@@ -575,68 +786,160 @@ const Datasets = () => {
 
                       {python.pipeline_meta?.activities?.length > 0 && (
                         <Box>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span role="img" aria-label="activities">⚡</span> Pipeline Activities
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontWeight: 700,
+                              mb: 1,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <span role="img" aria-label="activities">
+                              ⚡
+                            </span>{" "}
+                            Pipeline Activities
                           </Typography>
-                          <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-                            <Stack direction="row" flexWrap="wrap" spacing={1} useFlexGap>
-                              {python.pipeline_meta.activities.map((act, idx) => (
-                                <Chip 
-                                  key={idx} 
-                                  label={`${act.name} (${act.type})`} 
-                                  size="small" 
-                                  variant="outlined" 
-                                  sx={{ bgcolor: 'white' }}
-                                />
-                              ))}
+                          <Box
+                            sx={{
+                              p: 2,
+                              bgcolor: "grey.50",
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          >
+                            <Stack
+                              direction="row"
+                              flexWrap="wrap"
+                              spacing={1}
+                              useFlexGap
+                            >
+                              {python.pipeline_meta.activities.map(
+                                (act, idx) => (
+                                  <Chip
+                                    key={idx}
+                                    label={`${act.name} (${act.type})`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ bgcolor: "white" }}
+                                  />
+                                ),
+                              )}
                             </Stack>
                           </Box>
                         </Box>
                       )}
 
                       <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 700, mb: 1 }}
+                        >
                           Contextual Insights
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-                          {python.contextual_summary || llm.contextual_summary || "No contextual insights available."}
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            p: 2,
+                            bgcolor: "grey.50",
+                            borderRadius: 1,
+                            border: "1px solid",
+                            borderColor: "divider",
+                          }}
+                        >
+                          {python.contextual_summary ||
+                            llm.contextual_summary ||
+                            "No contextual insights available."}
                         </Typography>
                       </Box>
 
                       <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 700, mb: 1 }}
+                        >
                           Baseline & Anomalies
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-                          {python.differences || llm.differences || "This is the first recorded run; no baseline exists."}
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            p: 2,
+                            bgcolor: "grey.50",
+                            borderRadius: 1,
+                            border: "1px solid",
+                            borderColor: "divider",
+                          }}
+                        >
+                          {python.differences ||
+                            llm.differences ||
+                            "This is the first recorded run; no baseline exists."}
                         </Typography>
                       </Box>
 
                       {llm.pii_inspection && (
                         <Box>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{ fontWeight: 700, mb: 1 }}
+                          >
                             PII Data Inspection
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              p: 2,
+                              bgcolor: "grey.50",
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          >
                             {llm.pii_inspection}
                           </Typography>
                         </Box>
                       )}
 
-                      {(llm.recommendations?.length > 0 || python.findings?.length > 0) && (
+                      {(llm.recommendations?.length > 0 ||
+                        python.findings?.length > 0) && (
                         <Box>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'primary.main' }}>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontWeight: 700,
+                              mb: 1,
+                              color: "primary.main",
+                            }}
+                          >
                             Actionable Recommendations
                           </Typography>
-                          <Box sx={{ p: 2, bgcolor: 'primary.50', borderRadius: 1, border: '1px solid', borderColor: 'primary.100' }}>
+                          <Box
+                            sx={{
+                              p: 2,
+                              bgcolor: "primary.50",
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: "primary.100",
+                            }}
+                          >
                             <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
-                              { (llm.recommendations || []).concat(python.findings || []).map((rec, idx) => (
-                                <li key={idx}>
-                                  <Typography variant="body2" color="text.primary" sx={{ fontWeight: 500 }}>
-                                    {rec}
-                                  </Typography>
-                                </li>
-                              ))}
+                              {(llm.recommendations || [])
+                                .concat(python.findings || [])
+                                .map((rec, idx) => (
+                                  <li key={idx}>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.primary"
+                                      sx={{ fontWeight: 500 }}
+                                    >
+                                      {rec}
+                                    </Typography>
+                                  </li>
+                                ))}
                             </ul>
                           </Box>
                         </Box>

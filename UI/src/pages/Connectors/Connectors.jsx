@@ -325,6 +325,23 @@ const Connectors = () => {
     dispatch(fetchConnectors());
   };
 
+  // Shared header cell style
+  const headerCellSx = {
+    fontSize: "20px", // 14px — clearly larger than default small
+    fontWeight: 700,
+    color: "text.primary",
+    letterSpacing: "0.02em",
+    py: 1.5,
+    whiteSpace: "nowrap",
+  };
+
+  // Shared body cell style
+  const bodyCellSx = {
+    fontSize: "16px",
+    fontWeight: 600,
+    py: 1.25,
+  };
+
   return (
     <Box>
       <Stack
@@ -344,7 +361,7 @@ const Connectors = () => {
             onChange={(e) => setSearch(e.target.value)}
             sx={{ flex: 1, maxWidth: 220 }}
           />
-          
+
           <Button
             startIcon={<AddIcon />}
             onClick={openAddDialog}
@@ -382,19 +399,19 @@ const Connectors = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>
+                    <TableCell sx={headerCellSx}>
                       <strong>Name</strong>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={headerCellSx}>
                       <strong>Type</strong>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={headerCellSx}>
                       <strong>Status</strong>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={headerCellSx}>
                       <strong>Last Tested</strong>
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell sx={headerCellSx} align="right">
                       <strong>Actions</strong>
                     </TableCell>
                   </TableRow>
@@ -409,15 +426,17 @@ const Connectors = () => {
                   ) : (
                     filteredConnectors.map((c) => (
                       <TableRow key={c.id} hover>
-                        <TableCell sx={{ fontWeight: 500 }}>{c.name}</TableCell>
-                        <TableCell>
+                        <TableCell sx={bodyCellSx}>
+                          {c.name}
+                        </TableCell>
+                        <TableCell sx={bodyCellSx}>
                           <Chip
                             label={c.type}
                             size="small"
                             variant="outlined"
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={bodyCellSx}>
                           <Chip
                             label={c.status || "unknown"}
                             size="small"
@@ -430,14 +449,14 @@ const Connectors = () => {
                             }
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={bodyCellSx}>
                           <Typography variant="caption">
                             {c.last_tested_at
                               ? new Date(c.last_tested_at).toLocaleString()
                               : "-"}
                           </Typography>
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell sx={bodyCellSx} align="right">
                           <Tooltip title="Test Connection">
                             <span>
                               <IconButton
