@@ -112,7 +112,7 @@ def _process_unchecked_datasets():
                         alert_msg += "Failed Rules: " + "; ".join([f"{r.get('rule_type')}: {r.get('reason')}" for r in failed_rules[:3]])
 
                     try:
-                        execute(
+                        alert_id = execute(
                             "INSERT INTO alerts (connector_id, dataset_id, category, severity, title, message, status) "
                             "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                             (
@@ -125,7 +125,18 @@ def _process_unchecked_datasets():
                                 "open",
                             ),
                         )
-                        logger.info("Created quality alert for dataset %d", dataset_id)
+                        logger.info("Created quality alert for dataset %d (ID: %s)", dataset_id, alert_id)
+                        try:
+                            from utils.escalation_engine import start_incident_escalation
+                            start_incident_escalation(
+                                alert_id=alert_id,
+                                category="quality",
+                                severity=severity,
+                                dataset_id=dataset_id,
+                                connector_id=dataset["connector_id"]
+                            )
+                        except Exception as ne:
+                            logger.error("Escalation trigger failed for quality alert %s: %s", alert_id, ne)
                     except Exception as e:
                         logger.warning("Failed to create quality alert: %s", e)
 
@@ -135,7 +146,7 @@ def _process_unchecked_datasets():
                     alert_msg = f"Detected PII categories: {', '.join(pii_categories)}"
 
                     try:
-                        execute(
+                        alert_id = execute(
                             "INSERT INTO alerts (connector_id, dataset_id, category, severity, title, message, status) "
                             "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                             (
@@ -148,7 +159,18 @@ def _process_unchecked_datasets():
                                 "open",
                             ),
                         )
-                        logger.info("Created PII alert for dataset %d", dataset_id)
+                        logger.info("Created PII alert for dataset %d (ID: %s)", dataset_id, alert_id)
+                        try:
+                            from utils.escalation_engine import start_incident_escalation
+                            start_incident_escalation(
+                                alert_id=alert_id,
+                                category="pii",
+                                severity="high",
+                                dataset_id=dataset_id,
+                                connector_id=dataset["connector_id"]
+                            )
+                        except Exception as ne:
+                            logger.error("Escalation trigger failed for PII alert %s: %s", alert_id, ne)
                     except Exception as e:
                         logger.warning("Failed to create PII alert: %s", e)
 

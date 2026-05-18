@@ -63,6 +63,36 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Hourly medium-alert digest
+    from utils.email_notifier import send_medium_digest
+    _scheduler.add_job(
+        send_medium_digest,
+        trigger=IntervalTrigger(hours=1),
+        id="send_medium_digest",
+        name="Send consolidates hourly digest for medium-severity alerts",
+        replace_existing=True,
+    )
+
+    # Daily summary for low / info alerts
+    from utils.email_notifier import send_daily_summary
+    _scheduler.add_job(
+        send_daily_summary,
+        trigger=IntervalTrigger(days=1),
+        id="send_daily_summary",
+        name="Send daily summary for low/info alerts",
+        replace_existing=True,
+    )
+
+    # 1-minute SLA Escalation checker
+    from utils.escalation_engine import run_escalations
+    _scheduler.add_job(
+        run_escalations,
+        trigger=IntervalTrigger(minutes=1),
+        id="run_sla_escalations",
+        name="Evaluate active alerts SLA thresholds and execute escalations",
+        replace_existing=True,
+    )
+
     _scheduler.start()
     logger.info("Background scheduler started — rescan every 6 hours")
 
