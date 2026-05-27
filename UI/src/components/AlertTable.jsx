@@ -28,7 +28,7 @@ const formatDate = (val) => {
   }
 };
 
-const AlertTable = ({ alerts = [], onRowClick, dense = false, hideSource = false }) => {
+const AlertTable = ({ alerts = [], onRowClick, dense = false, hideSource = false, hideAction = false }) => {
   if (!alerts || alerts.length === 0) {
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
@@ -48,7 +48,7 @@ const AlertTable = ({ alerts = [], onRowClick, dense = false, hideSource = false
             {!hideSource && <TableCell><strong>Source</strong></TableCell>}
             <TableCell><strong>Status</strong></TableCell>
             <TableCell><strong>Created</strong></TableCell>
-            <TableCell align="right"><strong>Action</strong></TableCell>
+            {!hideAction && <TableCell align="right"><strong>Action</strong></TableCell>}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -87,13 +87,15 @@ const AlertTable = ({ alerts = [], onRowClick, dense = false, hideSource = false
               <TableCell>
                 <Typography variant="caption">{formatDate(a.created_at)}</Typography>
               </TableCell>
-              <TableCell align="right">
-                <Tooltip title="View Details">
-                  <IconButton size="small" onClick={() => onRowClick && onRowClick(a)}>
-                    <VisibilityIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </TableCell>
+              {!hideAction && (
+                <TableCell align="right">
+                  <Tooltip title="View Details">
+                    <IconButton size="small" onClick={() => onRowClick && onRowClick(a)}>
+                      <VisibilityIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

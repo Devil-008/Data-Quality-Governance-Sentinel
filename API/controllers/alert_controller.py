@@ -41,6 +41,34 @@ def get_alert(alert_id: int, user: dict = Depends(get_current_user)):
     )
     if not row:
         raise HTTPException(status_code=404, detail="Alert not found")
+
+    # If AI summary is missing, generate it dynamically using the Knowledge Graph prompt!
+    if not row.get("ai_summary"):
+        from utils.ai_helper import analyze_issue
+        ai_res = analyze_issue({
+            "alert_id": row["id"],
+            "category": row["category"],
+            "severity": row["severity"],
+            "title": row["title"],
+            "message": row["message"],
+            "connector": row.get("connector_name"),
+            "dataset": row.get("dataset_name"),
+        })
+        row["ai_summary"] = ai_res.get("contextual_summary")
+        row["ai_root_cause"] = ai_res.get("root_cause")
+        row["ai_impact"] = ai_res.get("impact")
+        row["ai_recommendation"] = ai_res.get("recommendation")
+        row["confidence_score"] = ai_res.get("confidence_score")
+        row["graph_nodes_to_update"] = ai_res.get("graph_nodes_to_update")
+        
+        # Save standard fields to DB so we don't query LLM every time
+        try:
+            execute("UPDATE alerts SET ai_summary=%s, ai_root_cause=%s, ai_impact=%s, ai_recommendation=%s WHERE id=%s",
+                    (row["ai_summary"], row["ai_root_cause"], row["ai_impact"], row["ai_recommendation"], alert_id))
+        except Exception as e:
+            from utils.common import logger
+            logger.error("Failed to update alert AI summary: %s", e)
+
     return row
 
 

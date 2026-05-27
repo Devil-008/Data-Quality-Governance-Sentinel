@@ -40,12 +40,15 @@ def alert_analysis(alert_id: int, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Alert not found")
     if a.get("ai_summary") or a.get("ai_recommendation"):
         return {
-            "summary": a.get("ai_summary"),
+            "contextual_summary": a.get("ai_summary"),
             "root_cause": a.get("ai_root_cause"),
             "impact": a.get("ai_impact"),
             "recommendation": a.get("ai_recommendation"),
+            "confidence_score": 90, # mock for DB cached ones
+            "graph_nodes_to_update": []
         }
     return analyze_issue({
+        "alert_id": a["id"],
         "category": a["category"],
         "severity": a["severity"],
         "title": a["title"],

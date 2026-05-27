@@ -31,7 +31,6 @@ import { useSearchParams } from "react-router-dom";
 import {
   fetchAlerts,
   fetchAlertDetail,
-  updateAlertStatus,
   clearDetail,
 } from "../../redux/slices/alertSlice";
 import AlertTable, {
@@ -64,22 +63,23 @@ const Alerts = () => {
     status: "",
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [updating, setUpdating] = useState(false);
   const [searchParams] = useSearchParams();
 
   const applyFilters = () => {
-    // API calls removed
+    dispatch(fetchAlerts(filters));
   };
 
   useEffect(() => {
-    // API calls removed
+    dispatch(fetchAlerts(filters));
     const id = searchParams.get("id");
     if (id) {
+      dispatch(fetchAlertDetail(id));
       setDrawerOpen(true);
     }
   }, [dispatch, searchParams]);
 
   const openDrawer = (a) => {
+    dispatch(fetchAlertDetail(a.id));
     setDrawerOpen(true);
   };
 
@@ -88,13 +88,7 @@ const Alerts = () => {
     dispatch(clearDetail());
   };
 
-  const handleStatus = async (status) => {
-    if (!detail) return;
-    setUpdating(true);
-    // API calls removed
-    setUpdating(false);
-    applyFilters();
-  };
+
 
   return (
     <Box>
@@ -372,6 +366,51 @@ const Alerts = () => {
                         </Typography>
                       </Box>
                     )}
+                    {detail.confidence_score !== undefined && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 600,
+                            color: "text.secondary",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          AI Confidence Score
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="h6" color={detail.confidence_score > 70 ? "success.main" : "warning.main"}>
+                            {detail.confidence_score}%
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
+                    {detail.graph_nodes_to_update && detail.graph_nodes_to_update.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 600,
+                            color: "text.secondary",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Knowledge Graph Remediation
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 0.5 }}>
+                          {detail.graph_nodes_to_update.map((node, i) => (
+                            <Paper key={i} variant="outlined" sx={{ p: 1, bgcolor: 'background.default' }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {node.node_type} [{node.node_id}] ➔ {node.action}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Reason: {node.reason}
+                              </Typography>
+                            </Paper>
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
                   </CardContent>
                 </Card>
               ) : (
@@ -383,48 +422,6 @@ const Alerts = () => {
                 </MuiAlert>
               )}
 
-              <Divider sx={{ my: 2 }} />
-
-              <Stack direction="row" spacing={1}>
-                <Button
-                  variant="outlined"
-                  disabled={updating || detail.status === "acknowledged"}
-                  startIcon={
-                    updating ? (
-                      <CircularProgress size={16} />
-                    ) : (
-                      <VisibilityIcon />
-                    )
-                  }
-                  onClick={() => handleStatus("acknowledged")}
-                >
-                  Acknowledge
-                </Button>
-                <Button
-                  variant="contained"
-                  color="success"
-                  disabled={updating || detail.status === "resolved"}
-                  startIcon={
-                    updating ? (
-                      <CircularProgress size={16} />
-                    ) : (
-                      <CheckCircleOutlineIcon />
-                    )
-                  }
-                  onClick={() => handleStatus("resolved")}
-                >
-                  Resolve
-                </Button>
-                {detail.status !== "open" && (
-                  <Button
-                    variant="text"
-                    disabled={updating}
-                    onClick={() => handleStatus("open")}
-                  >
-                    Reopen
-                  </Button>
-                )}
-              </Stack>
             </Box>
           )}
         </Box>

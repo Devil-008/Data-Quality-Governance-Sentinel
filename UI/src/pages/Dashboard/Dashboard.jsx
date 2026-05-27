@@ -61,19 +61,19 @@ const Dashboard = () => {
     day: t.day ? new Date(t.day).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '-',
     count: t.c,
   }));
-  
-  const categoryData = (charts.category || []).map((c) => ({ 
-    category: c.category, 
-    count: c.c 
+
+  const categoryData = (charts.category || []).map((c) => ({
+    category: c.category,
+    count: c.c
   }));
 
   const cardConfigs = [
-    { label: 'Total Connectors', value: cards.total_connectors, icon: <HubIcon />, color: '#6366f1' },
-    { label: 'Healthy Connectors', value: cards.healthy_connectors, icon: <CheckCircleIcon />, color: '#10b981' },
-    { label: 'Total Datasets', value: cards.dataset_count, icon: <StorageIcon />, color: '#0ea5e9' },
-    { label: 'PII Datasets', value: cards.pii_datasets, icon: <PrivacyTipIcon />, color: '#f43f5e' },
-    { label: 'Critical Alerts', value: cards.critical_alerts, icon: <ErrorOutlineIcon />, color: '#f97316' },
-    { label: 'Active Jobs', value: cards.monitoring_jobs, icon: <EventRepeatIcon />, color: '#8b5cf6' },
+    { label: 'Total Connectors', value: cards.total_connectors, icon: <HubIcon />, color: '#6366f1', onClick: () => navigate('/connectors') },
+    { label: 'Healthy Connectors', value: cards.healthy_connectors, icon: <CheckCircleIcon />, color: '#10b981', onClick: () => navigate('/connectors') },
+    { label: 'Total Datasets', value: cards.dataset_count, icon: <StorageIcon />, color: '#0ea5e9', onClick: () => navigate('/datasets') },
+    { label: 'PII Datasets', value: cards.pii_datasets, icon: <PrivacyTipIcon />, color: '#f43f5e', onClick: () => navigate('/datasets') },
+    { label: 'Critical Alerts', value: cards.critical_alerts, icon: <ErrorOutlineIcon />, color: '#f97316', onClick: () => navigate('/alerts') },
+    // { label: 'Active Jobs', value: cards.monitoring_jobs, icon: <EventRepeatIcon />, color: '#8b5cf6' },
   ];
 
   return (
@@ -89,11 +89,11 @@ const Dashboard = () => {
           </Typography>
         </Box>
         <Stack direction="row" spacing={2}>
-          <Button 
-            startIcon={<RefreshIcon />} 
-            onClick={() => dispatch(fetchDashboard())} 
-            variant="contained" 
-            sx={{ 
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={() => dispatch(fetchDashboard())}
+            variant="contained"
+            sx={{
               borderRadius: 2,
               textTransform: 'none',
               fontWeight: 600,
@@ -114,12 +114,13 @@ const Dashboard = () => {
       {/* Stats Grid */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {cardConfigs.map((config, idx) => (
-          <Grid item xs={12} sm={6} md={4} lg={2} key={idx}>
-            <StatCard 
-              icon={config.icon} 
-              label={config.label} 
-              value={config.value} 
+          <Grid item xs={12} sm={6} md={4} lg key={idx}>
+            <StatCard
+              icon={config.icon}
+              label={config.label}
+              value={config.value}
               color={config.color}
+              onClick={config.onClick}
             />
           </Grid>
         ))}
@@ -147,36 +148,36 @@ const Dashboard = () => {
                     <AreaChart data={trendData}>
                       <defs>
                         <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.1}/>
-                          <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0}/>
+                          <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.1} />
+                          <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
-                      <XAxis 
-                        dataKey="day" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} 
-                      />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false} 
+                      <XAxis
+                        dataKey="day"
+                        axisLine={false}
+                        tickLine={false}
                         tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
                       />
-                      <Tooltip 
-                        contentStyle={{ 
-                          borderRadius: '8px', 
-                          border: 'none', 
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)' 
-                        }} 
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
                       />
-                      <Area 
-                        type="monotone" 
-                        dataKey="count" 
-                        stroke={theme.palette.primary.main} 
-                        strokeWidth={3} 
-                        fillOpacity={1} 
-                        fill="url(#colorCount)" 
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: '8px',
+                          border: 'none',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="count"
+                        stroke={theme.palette.primary.main}
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorCount)"
                         name="Alerts"
                       />
                     </AreaChart>
@@ -213,14 +214,14 @@ const Dashboard = () => {
                           <Cell key={idx} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip 
-                         contentStyle={{ 
-                          borderRadius: '8px', 
-                          border: 'none', 
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)' 
-                        }} 
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: '8px',
+                          border: 'none',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }}
                       />
-                      <Legend verticalAlign="bottom" height={36}/>
+                      <Legend verticalAlign="bottom" height={36} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -244,7 +245,7 @@ const Dashboard = () => {
                   View All Alerts
                 </Button>
               </Stack>
-              <AlertTable alerts={recentAlerts} onRowClick={(a) => navigate(`/alerts?id=${a.id}`)} dense />
+              <AlertTable alerts={recentAlerts} dense hideAction={true} />
             </CardContent>
           </Card>
         </Grid>
@@ -277,11 +278,11 @@ const Dashboard = () => {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Box sx={{ 
-                                width: 8, 
-                                height: 8, 
-                                borderRadius: '50%', 
-                                bgcolor: c.status === 'Connected' ? 'success.main' : 'error.main' 
+                              <Box sx={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                bgcolor: c.status === 'Connected' ? 'success.main' : 'error.main'
                               }} />
                               <Typography variant="caption">{c.status}</Typography>
                             </Box>
@@ -303,9 +304,9 @@ const Dashboard = () => {
               <CardContent sx={{ p: 3 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>Monitoring Stream</Typography>
-                  <Button 
-                    size="small" 
-                    onClick={() => navigate('/data-quality-history')} 
+                  <Button
+                    size="small"
+                    onClick={() => navigate('/data-quality-history')}
                     sx={{ textTransform: 'none', fontWeight: 600 }}
                   >
                     View All
@@ -327,29 +328,29 @@ const Dashboard = () => {
                             <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                               {r.dataset_name || r.connector_name}
                             </Typography>
-                            <Chip 
-                              label={r.run_type} 
-                              size="small" 
-                              sx={{ 
-                                height: 18, 
-                                fontSize: '0.65rem', 
-                                textTransform: 'uppercase', 
+                            <Chip
+                              label={r.run_type}
+                              size="small"
+                              sx={{
+                                height: 18,
+                                fontSize: '0.65rem',
+                                textTransform: 'uppercase',
                                 fontWeight: 700,
                                 bgcolor: 'primary.light',
                                 color: 'primary.dark',
                                 border: 'none'
-                              }} 
+                              }}
                             />
                           </Stack>
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                             {r.connector_name} • {new Date(r.started_at).toLocaleString()}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
-                            <Box sx={{ 
-                              width: 6, 
-                              height: 6, 
-                              borderRadius: '50%', 
-                              bgcolor: r.status === 'success' ? 'success.main' : 'error.main' 
+                            <Box sx={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: '50%',
+                              bgcolor: r.status === 'success' ? 'success.main' : 'error.main'
                             }} />
                             <Typography variant="caption" sx={{ fontWeight: 500, color: r.status === 'success' ? 'success.main' : 'error.main' }}>
                               {r.status}

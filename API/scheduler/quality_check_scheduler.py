@@ -10,11 +10,12 @@ This scheduler runs every 10 minutes and:
 import datetime
 import threading
 import json
+# pyrefly: ignore [missing-import]
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from database.db_connection import fetch_all, execute, fetch_one
 from utils.common import logger
-# from controllers.monitoring_controller import _run_ai_quality_checks
+from controllers.monitoring_controller import run_quality_for_dataset
 from utils.email_helper import send_alert_email
 
 _scheduler: BackgroundScheduler | None = None
@@ -71,29 +72,32 @@ def _process_unchecked_datasets():
                     connector.get("type") if connector else "unknown"
                 )
 
-                # Run AI quality checks
-                ai_res = _run_ai_quality_checks(dataset_id, dataset, sample_rows=None)
-                quality_score = ai_res.get("quality_score", 100.0)
-                summary = ai_res.get("summary", "Check completed")
-                pii_categories = [c for c in ai_res.get("pii_detected", []) if c != "NA"]
-
-                logger.info(
-                    "AI checks returned: dataset=%d, score=%.1f, status=%s",
-                    dataset_id,
-                    quality_score,
-                    ai_res.get("status"),
-                )
-
-                # Format PII categories
-                pii_cats_str = ",".join(pii_categories) if pii_categories else None
-                contains_pii = 1 if pii_categories else 0
-
-                # Update dataset with quality score and PII info
-                now = datetime.datetime.utcnow()
-                execute(
-                    "UPDATE datasets SET quality_score=%s, pii_categories=%s, contains_pii=%s, last_profiled_at=%s, ai_analysis_json=%s WHERE id=%s",
-                    (quality_score, pii_cats_str, contains_pii, now, json.dumps(ai_res), dataset_id),
-                )
+                # Run AI quality checks via controller
+                run_quality_for_dataset(dataset_id)
+                
+                # Fetch updated dataset for alert evaluation
+                updated = fetch_one("SELECT * FROM datasets WHERE id=%s", (dataset_id,))
+                if not updated:
+                    continue
+                
+                quality_score = updated.get("quality_score") or 100.0
+                
+                # Parse analysis JSON to get failed rules and PII info
+                ai_json = updated.get("ai_analysis_json")
+                ai_res = {}
+                if ai_json:
+                    try:
+                        ai_res = json.loads(ai_json)
+                    except:
+                        pass
+                
+                py_result = ai_res.get("python", {})
+                llm_res = ai_res.get("llm", {})
+                
+                summary = llm_res.get("executive_summary", "Check completed")
+                failed_rules = py_result.get("failed_rules", [])
+                severity = py_result.get("severity", "medium")
+                pii_categories = py_result.get("pii_columns", [])
 
                 logger.info(
                     "Quality check completed for dataset %d: score=%.1f",
@@ -126,6 +130,18 @@ def _process_unchecked_datasets():
                             ),
                         )
                         logger.info("Created quality alert for dataset %d (ID: %s)", dataset_id, alert_id)
+                        
+                        try:
+                            from utils.graph_helper import graph_db
+                            graph_db.insert_alert(alert_id, alert_title, alert_msg, dataset_id)
+                            for r in failed_rules:
+                                rule_name = r.get("rule_type") or r.get("rule")
+                                if rule_name:
+                                    graph_db.insert_rule(rule_name, 0, f"Rule: {rule_name}")
+                                    graph_db.create_edge("VIOLATES", f"Alert/{alert_id}", f"Rule/{rule_name}")
+                        except Exception as ge:
+                            logger.error("Graph DB alert insert failed: %s", ge)
+
                         try:
                             from utils.escalation_engine import start_incident_escalation
                             start_incident_escalation(
@@ -160,6 +176,16 @@ def _process_unchecked_datasets():
                             ),
                         )
                         logger.info("Created PII alert for dataset %d (ID: %s)", dataset_id, alert_id)
+                        
+                        try:
+                            from utils.graph_helper import graph_db
+                            graph_db.insert_alert(alert_id, alert_title, alert_msg, dataset_id)
+                            for pii_cat in pii_categories:
+                                graph_db.insert_rule(pii_cat, 0, f"PII Category: {pii_cat}")
+                                graph_db.create_edge("VIOLATES", f"Alert/{alert_id}", f"Rule/{pii_cat}")
+                        except Exception as ge:
+                            logger.error("Graph DB PII alert insert failed: %s", ge)
+
                         try:
                             from utils.escalation_engine import start_incident_escalation
                             start_incident_escalation(
