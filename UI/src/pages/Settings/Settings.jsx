@@ -20,6 +20,13 @@ const SettingsPage = () => {
   const themeMode = useSelector((s) => s.theme.mode);
 
   const [recipients, setRecipients] = useState('');
+  const [recipientsQuality, setRecipientsQuality] = useState('');
+  const [recipientsSchemaDrift, setRecipientsSchemaDrift] = useState('');
+  const [recipientsPii, setRecipientsPii] = useState('');
+  const [recipientsGovernance, setRecipientsGovernance] = useState('');
+  const [recipientsPipeline, setRecipientsPipeline] = useState('');
+  const [recipientsCloud, setRecipientsCloud] = useState('');
+  const [recipientsDatabricks, setRecipientsDatabricks] = useState('');
   const [defaultInterval, setDefaultInterval] = useState('60');
   const [aiEnabled, setAiEnabled] = useState('1');
   const [pwd, setPwd] = useState({ old_password: '', new_password: '', confirm: '' });
@@ -34,6 +41,13 @@ const SettingsPage = () => {
     if (!list) return;
     const find = (k) => (list.find((s) => s.setting_key === k) || {}).setting_value || '';
     setRecipients(find('alert_email_recipients'));
+    setRecipientsQuality(find('email_recipients_quality'));
+    setRecipientsSchemaDrift(find('email_recipients_schema_drift'));
+    setRecipientsPii(find('email_recipients_pii'));
+    setRecipientsGovernance(find('email_recipients_governance'));
+    setRecipientsPipeline(find('email_recipients_pipeline'));
+    setRecipientsCloud(find('email_recipients_cloud'));
+    setRecipientsDatabricks(find('email_recipients_databricks'));
     setDefaultInterval(find('default_scan_interval_minutes') || '60');
     setAiEnabled(find('ai_enabled') || '1');
   }, [list]);
@@ -107,6 +121,71 @@ const SettingsPage = () => {
                   Only admins can update this setting.
                 </Typography>
               )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                <EmailIcon color="primary" />
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Category Routing</Typography>
+              </Stack>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                Specify different emails per category. Fallbacks to default if left blank.
+              </Typography>
+              <Stack spacing={2} sx={{ maxHeight: 300, overflowY: 'auto', pr: 1 }}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Data Quality Alerts</Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField fullWidth size="small" value={recipientsQuality} onChange={(e) => setRecipientsQuality(e.target.value)} placeholder="Quality team emails" disabled={!isAdmin} />
+                    <Button variant="outlined" size="small" onClick={() => save('email_recipients_quality', recipientsQuality)} disabled={!isAdmin}>Save</Button>
+                  </Stack>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Schema Drift Alerts</Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField fullWidth size="small" value={recipientsSchemaDrift} onChange={(e) => setRecipientsSchemaDrift(e.target.value)} placeholder="Schema team emails" disabled={!isAdmin} />
+                    <Button variant="outlined" size="small" onClick={() => save('email_recipients_schema_drift', recipientsSchemaDrift)} disabled={!isAdmin}>Save</Button>
+                  </Stack>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>PII Exposure Alerts</Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField fullWidth size="small" value={recipientsPii} onChange={(e) => setRecipientsPii(e.target.value)} placeholder="Privacy team emails" disabled={!isAdmin} />
+                    <Button variant="outlined" size="small" onClick={() => save('email_recipients_pii', recipientsPii)} disabled={!isAdmin}>Save</Button>
+                  </Stack>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Governance Violations</Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField fullWidth size="small" value={recipientsGovernance} onChange={(e) => setRecipientsGovernance(e.target.value)} placeholder="Governance team emails" disabled={!isAdmin} />
+                    <Button variant="outlined" size="small" onClick={() => save('email_recipients_governance', recipientsGovernance)} disabled={!isAdmin}>Save</Button>
+                  </Stack>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Pipeline Failures</Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField fullWidth size="small" value={recipientsPipeline} onChange={(e) => setRecipientsPipeline(e.target.value)} placeholder="Ops team emails" disabled={!isAdmin} />
+                    <Button variant="outlined" size="small" onClick={() => save('email_recipients_pipeline', recipientsPipeline)} disabled={!isAdmin}>Save</Button>
+                  </Stack>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Cloud Systems</Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField fullWidth size="small" value={recipientsCloud} onChange={(e) => setRecipientsCloud(e.target.value)} placeholder="Cloud team emails" disabled={!isAdmin} />
+                    <Button variant="outlined" size="small" onClick={() => save('email_recipients_cloud', recipientsCloud)} disabled={!isAdmin}>Save</Button>
+                  </Stack>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Databricks Specific</Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField fullWidth size="small" value={recipientsDatabricks} onChange={(e) => setRecipientsDatabricks(e.target.value)} placeholder="Databricks team emails" disabled={!isAdmin} />
+                    <Button variant="outlined" size="small" onClick={() => save('email_recipients_databricks', recipientsDatabricks)} disabled={!isAdmin}>Save</Button>
+                  </Stack>
+                </Box>
+              </Stack>
             </CardContent>
           </Card>
         </Grid>

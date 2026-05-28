@@ -14,15 +14,19 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ShieldIcon from '@mui/icons-material/Shield';
+import DescriptionIcon from '@mui/icons-material/Description';
+import RuleIcon from '@mui/icons-material/Rule';
 import { logout } from '../redux/slices/authSlice';
 
 const drawerWidth = 240;
 
 const items = [
-  { label: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+  { label: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { label: 'Connectors', icon: <HubIcon />, path: '/connectors' },
   { label: 'Datasets', icon: <StorageIcon />, path: '/datasets' },
-  { label: 'Monitoring', icon: <MonitorHeartIcon />, path: '/monitoring' },
+  { label: 'Rule Books', icon: <DescriptionIcon />, path: '/rule-books' },
+  // { label: 'Monitoring', icon: <MonitorHeartIcon />, path: '/monitoring' },
+  { label: 'Data Quality History', icon: <RuleIcon />, path: '/data-quality-history' },
   { label: 'Alerts', icon: <NotificationsActiveIcon />, path: '/alerts' },
   { label: 'Notifications', icon: <NotificationsIcon />, path: '/notifications' },
   { label: 'Settings', icon: <SettingsIcon />, path: '/settings' },
@@ -35,7 +39,7 @@ const Sidebar = () => {
 
   const handleLogout = () => {
     dispatch(logout());
-    navigate('/login');
+    navigate('/');
   };
 
   return (
@@ -64,7 +68,9 @@ const Sidebar = () => {
       <Box sx={{ overflow: 'auto', flex: 1 }}>
         <List sx={{ px: 1 }}>
           {items.map((item) => {
-            const selected = location.pathname === item.path;
+            const selected = item.path === '/dashboard' 
+              ? (location.pathname === '/dashboard' || location.pathname === '/')
+              : location.pathname.startsWith(item.path);
             return (
               <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
                 <ListItemButton

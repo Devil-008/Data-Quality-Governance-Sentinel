@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>SLA Escalation Alert</title></head>
+<body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafafc;margin:0;padding:24px;color:#1e293b;">
+  <table cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+    <tr>
+      <td {{ header_style | safe }}>
+        <div style="font-size:12px;letter-spacing:1.5px;opacity:.85;text-transform:uppercase;font-weight:600;">DQ Sentinel Alert Escalation</div>
+        <div style="font-size:22px;font-weight:700;margin-top:6px;">
+          {% if is_initial %}
+            Data Quality Incident Active
+          {% else %}
+            ⚠️ SLA Breach - Action Required
+          {% endif %}
+        </div>
+        <div style="font-size:13px;opacity:.9;margin-top:4px;">
+          Target Role: <b>{{ persona_name }}</b>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px;">
+        {% if not is_initial %}
+        <div style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:6px;padding:16px;margin-bottom:20px;font-size:14px;line-height:1.6;color:#991b1b;">
+          <b>SLA Breach Notification:</b> This high-priority incident was not acknowledged or resolved within the allocated SLA time threshold of <b>{{ prev_sla }} minutes</b> by the previous level. It has automatically escalated to your role for urgent resolution.
+        </div>
+        {% endif %}
+
+        <h3 style="margin:0 0 8px;font-size:18px;color:#0f172a;">{{ incident.title }}</h3>
+        
+        <!-- Defect Summary Statement -->
+        <div style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
+          A <b>{{ incident.incident_type | lower }}</b> defect has been detected in dataset <code>{{ incident.dataset_name or 'N/A' }}</code> (Connector: <b>{{ incident.connector_name or 'N/A' }}</b>).
+        </div>
+
+        <table cellpadding="0" cellspacing="0" width="100%" style="font-size:13px;color:#64748b;margin-bottom:20px;border-bottom:1px solid #f1f5f9;padding-bottom:14px;">
+          <tr>
+            <td style="padding:4px 0;">Category: <b>{{ incident.incident_type }}</b></td>
+            <td style="padding:4px 0;text-align:right;">Severity: <span style="font-weight:bold;color:#b91c1c;">{{ incident.severity | upper }}</span></td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;">Dataset: <code>{{ incident.dataset_name or 'N/A' }}</code></td>
+            <td style="padding:4px 0;text-align:right;">Connector: <b>{{ incident.connector_name or 'N/A' }}</b></td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;" colspan="2">Triggered At: {{ incident.started_at }} UTC</td>
+          </tr>
+        </table>
+
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;font-size:14px;line-height:1.6;color:#334155;margin-bottom:24px;">
+          <div style="font-weight:600;margin-bottom:6px;color:#0f172a;">Defect Details:</div>
+          {{ incident.message | replace('\n', '<br>') }}
+        </div>
+
+        <h4 style="margin:20px 0 8px;font-size:14px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.5px;">🛠️ Recommended Action to Resolve</h4>
+        <div style="font-size:14px;line-height:1.5;color:#1e3a8a;background:#eff6ff;padding:16px;border-radius:8px;border-left:4px solid #3b82f6;margin-bottom:12px;">
+          {% if incident.ai_recommendation %}
+            {{ incident.ai_recommendation }}
+          {% else %}
+            Review the data quality execution logs, analyze the mismatch thresholds, and update the pipeline validation rules or clean up the source table.
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

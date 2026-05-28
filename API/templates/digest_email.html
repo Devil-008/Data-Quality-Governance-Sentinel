@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>{{ severity_label }} Alert Digest</title></head>
+<body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f8fafc;margin:0;padding:24px;color:#334155;">
+  <table cellpadding="0" cellspacing="0" width="100%" style="max-width:680px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <tr>
+      <td style="background:#1e293b;color:#fff;padding:24px;">
+        <div style="font-size:12px;letter-spacing:1.5px;opacity:.75;text-transform:uppercase;font-weight:600;">DQ SENTINEL OBSERVED STATUS</div>
+        <div style="font-size:22px;font-weight:700;margin-top:6px;">{{ severity_label }} Alert Digest</div>
+        <div style="font-size:13px;opacity:.8;margin-top:4px;">Consolidated summary of issues detected recently (As of {{ now.strftime('%Y-%m-%d %H:%M UTC') }})</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px;">
+        <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">
+          The system detected the following <b>{{ alerts|length }}</b> issue(s) that require your attention.
+        </p>
+
+        {% for alert in alerts %}
+        <div style="border:1px solid #e2e8f0;border-radius:10px;margin-bottom:20px;overflow:hidden;">
+          <div style="background:#f8fafc;padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:11px;font-weight:bold;text-transform:uppercase;background:#e2e8f0;color:#475569;padding:2px 8px;border-radius:12px;">
+              {{ alert.severity | upper }}
+            </span>
+            <span style="font-size:12px;color:#64748b;">
+              Category: <b>{{ alert.category }}</b> · {{ alert.created_at }}
+            </span>
+          </div>
+          <div style="padding:16px;">
+            <h4 style="margin:0 0 8px;font-size:15px;color:#0f172a;">{{ alert.title }}</h4>
+            {% if alert.dataset_name %}
+            <div style="font-size:12px;color:#64748b;margin-bottom:10px;">
+              Dataset: <code style="background:#f1f5f9;padding:2px 4px;border-radius:4px;">{{ alert.dataset_name }}</code>
+              {% if alert.connector_name %} (via {{ alert.connector_name }}){% endif %}
+            </div>
+            {% endif %}
+            <div style="font-size:13px;line-height:1.5;color:#475569;background:#f8fafc;padding:10px;border-radius:6px;border-left:3px solid #cbd5e1;white-space:pre-wrap;">{{ alert.message }}</div>
+
+            {% if alert.ai_recommendation %}
+            <div style="margin-top:10px;font-size:13px;line-height:1.5;color:#1e3a8a;background:#eff6ff;padding:10px;border-radius:6px;">
+              <b>🤖 Fix Action:</b> {{ alert.ai_recommendation }}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f1f5f9;color:#64748b;font-size:11px;padding:16px 24px;text-align:center;border-top:1px solid #e2e8f0;">
+        DQ Sentinel Alerting Service. You can customize recipient groups per category in Sentinel settings dashboard.
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -44,7 +44,7 @@ const Header = () => {
   const handleLogout = () => {
     setAnchorEl(null);
     dispatch(logout());
-    navigate('/login');
+    navigate('/');
   };
 
   return (
@@ -81,12 +81,12 @@ const Header = () => {
             </IconButton>
           </Tooltip>
           <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-            <MenuItem disabled>
+            <MenuItem>
               <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                   {user?.username || '-'}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary' }}>
                   {user?.email || ''} · {user?.role || ''}
                 </Typography>
               </Box>

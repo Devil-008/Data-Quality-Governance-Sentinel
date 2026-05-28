@@ -20,22 +20,20 @@ const Notifications = () => {
   const { list, unread } = useSelector((s) => s.notifications);
 
   useEffect(() => {
-    dispatch(fetchNotifications());
-    dispatch(fetchUnreadCount());
+    // API calls removed
   }, [dispatch]);
 
   const refresh = () => {
-    dispatch(fetchNotifications());
-    dispatch(fetchUnreadCount());
+    // API calls removed
   };
 
   const handleMarkAll = async () => {
-    await dispatch(markAllRead());
+    // API calls removed
     refresh();
   };
 
   const handleClickItem = (n) => {
-    if (!n.is_read) dispatch(markRead(n.id));
+    // API calls removed
     if (n.alert_id) navigate(`/alerts?id=${n.alert_id}`);
   };
 
@@ -47,10 +45,10 @@ const Notifications = () => {
           {unread > 0 && <Chip label={`${unread} unread`} color="error" size="small" />}
         </Stack>
         <Stack direction="row" spacing={1}>
-          <Button startIcon={<RefreshIcon />} onClick={refresh} variant="outlined">Refresh</Button>
           <Button startIcon={<DoneAllIcon />} onClick={handleMarkAll} variant="contained" disabled={unread === 0}>
             Mark All Read
           </Button>
+          <Button startIcon={<RefreshIcon />} onClick={refresh} variant="outlined"></Button>
         </Stack>
       </Stack>
 
@@ -102,7 +100,7 @@ const Notifications = () => {
                       }
                     />
                     {!n.is_read && (
-                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); dispatch(markRead(n.id)); }}>
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); /* API calls removed */ }}>
                         <CheckCircleIcon fontSize="small" />
                       </IconButton>
                     )}

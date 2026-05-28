@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>Pipeline Failure Notification</title></head>
+<body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fff5f5;margin:0;padding:24px;color:#2d3748;">
+  <table cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #fed7d7;">
+    <tr>
+      <td style="background:#e53e3e;color:#fff;padding:18px 24px;">
+        <div style="font-size:13px;letter-spacing:1px;opacity:.75;">DQ SENTINEL · PIPELINE STATUS</div>
+        <div style="font-size:20px;font-weight:600;margin-top:4px;">{{ alert.severity | upper }} FAILURE ALERT</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px;">
+        <h2 style="margin:0 0 6px;font-size:18px;color:#c53030;">{{ alert.title }}</h2>
+        <div style="font-size:12px;color:#718096;margin-bottom:14px;">
+          Category: <b>{{ alert.category }}</b> · Connected via: <b>{{ alert.connector_name }}</b> · Detected: {{ alert.created_at }}
+        </div>
+        <div style="background:#fffaf0;border-left:4px solid #dd6b20;border-radius:4px;padding:14px;font-size:14px;line-height:1.5;margin-bottom:20px;">
+          {{ alert.message }}
+        </div>
+
+        {% if alert.ai_summary %}
+        <h3 style="margin:20px 0 6px;font-size:14px;color:#2d3748;">🤖 AI Diagnostics Summary</h3>
+        <div style="font-size:14px;line-height:1.5;color:#4a5568;">{{ alert.ai_summary }}</div>
+        {% endif %}
+
+        {% if alert.ai_root_cause %}
+        <h3 style="margin:18px 0 6px;font-size:14px;color:#2d3748;">Probable Root Cause</h3>
+        <div style="font-size:14px;line-height:1.5;color:#4a5568;">{{ alert.ai_root_cause }}</div>
+        {% endif %}
+
+        {% if alert.ai_impact %}
+        <h3 style="margin:18px 0 6px;font-size:14px;color:#2d3748;">Business & Downstream Impact</h3>
+        <div style="font-size:14px;line-height:1.5;color:#4a5568;">{{ alert.ai_impact }}</div>
+        {% endif %}
+
+        {% if alert.ai_recommendation %}
+        <h3 style="margin:18px 0 6px;font-size:14px;color:#2d3748;">🛠️ Recommended Recovery Actions</h3>
+        <div style="font-size:14px;line-height:1.5;color:#2b6cb0;background:#ebf8ff;padding:10px;border-radius:6px;border-left:4px solid #3182ce;">
+          {{ alert.ai_recommendation }}
+        </div>
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f7fafc;color:#718096;font-size:11px;padding:14px 24px;text-align:center;border-top:1px solid #edf2f7;">
+        Automated pipeline monitoring alert from DQ Sentinel. Review standard operating procedures before re-running.
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

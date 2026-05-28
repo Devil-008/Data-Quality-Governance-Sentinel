@@ -13,13 +13,14 @@ load_dotenv()
 
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
+SMTP_USERNAME = os.getenv("SMTP_USERNAME") or os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME)
-SMTP_TLS = os.getenv("SMTP_TLS", "true").lower() == "true"
+SMTP_FROM = os.getenv("SMTP_FROM_EMAIL") or os.getenv("SMTP_FROM") or SMTP_USERNAME
+SMTP_TLS = (os.getenv("SMTP_TLS") or os.getenv("SMTP_USE_TLS") or "true").lower() == "true"
 
+TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 _env = Environment(
-    loader=FileSystemLoader("templates"),
+    loader=FileSystemLoader(TEMPLATE_DIR),
     autoescape=select_autoescape(["html", "xml"]),
 )
 
